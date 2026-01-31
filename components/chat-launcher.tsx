@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, Send, Bot, User } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { MessageCircle, X, Send, Bot, User, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -22,10 +22,24 @@ const initialMessages: Message[] = [
   },
 ];
 
+/** n8n Chat Trigger와 동일한 세션 ID 유지 (localStorage) */
+const CHAT_SESSION_KEY = "n8n_chat_session_id";
+
+function getOrCreateSessionId(): string {
+  if (typeof window === "undefined") return "";
+  let id = localStorage.getItem(CHAT_SESSION_KEY);
+  if (!id) {
+    id = crypto.randomUUID().replace(/-/g, "");
+    localStorage.setItem(CHAT_SESSION_KEY, id);
+  }
+  return id;
+}
+
 export function ChatLauncher() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [inputValue, setInputValue] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -43,29 +57,100 @@ export function ChatLauncher() {
     }
   }, [messages]);
 
-  const sendMessage = () => {
-    if (!inputValue.trim()) return;
+  const sendMessage = useCallback(async () => {
+    if (!inputValue.trim() || isLoading) return;
 
+    const text = inputValue.trim();
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: inputValue.trim(),
+      content: text,
       timestamp: new Date(),
     };
 
     setMessages(prev => [...prev, userMessage]);
     setInputValue("");
+    setIsLoading(true);
 
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: getAssistantResponse(userMessage.content),
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, assistantMessage]);
-    }, 800);
-  };
+    const assistantId = (Date.now() + 1).toString();
+    setMessages(prev => [
+      ...prev,
+      { id: assistantId, role: "assistant", content: "", timestamp: new Date() },
+    ]);
+
+    try {
+      const sessionId = getOrCreateSessionId();
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          chatInput: text,
+          action: "sendMessage"
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const contentType = res.headers.get("content-type") ?? "";
+
+      // 1. 스트리밍 응답
+      if (contentType.includes("text/event-stream") || contentType.includes("application/x-ndjson")) {
+        const reader = res.body?.getReader();
+        if (!reader) throw new Error("No reader");
+
+        const decoder = new TextDecoder();
+        let fullText = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          fullText += decoder.decode(value, { stream: true });
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === assistantId ? { ...m, content: fullText } : m
+            )
+          );
+        }
+      }
+      // 2. 일반 텍스트 응답
+      else if (contentType.includes("text/plain")) {
+        const text = await res.text();
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === assistantId ? { ...m, content: text } : m
+          )
+        );
+      }
+      // 3. JSON 응답
+      else {
+        const data = await res.json();
+        const content = typeof data === 'string'
+          ? data
+          : data.output || data.text || data.message || "응답을 불러오지 못했습니다.";
+
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === assistantId ? { ...m, content } : m
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Send message error:', error);
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === assistantId
+            ? { ...m, content: "연결에 실패했습니다. 잠시 후 다시 시도해 주세요." }
+            : m
+        )
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [inputValue, isLoading]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -78,14 +163,13 @@ export function ChatLauncher() {
     <>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed left-5 bottom-5 z-50 w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all duration-200 ${
-          isOpen
+        className={`fixed left-5 bottom-5 z-50 w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all duration-200 ${isOpen
             ? "bg-muted text-muted-foreground shadow-lg"
             : "bg-primary text-primary-foreground shadow-lg hover:scale-[1.03] hover:shadow-xl"
-        }`}
+          }`}
         style={{
-          boxShadow: isOpen 
-            ? undefined 
+          boxShadow: isOpen
+            ? undefined
             : "0 4px 14px rgba(0, 0, 0, 0.15), 0 0 20px rgba(var(--primary), 0.1)"
         }}
         data-testid="button-chat-launcher"
@@ -98,7 +182,7 @@ export function ChatLauncher() {
       </button>
 
       {isOpen && (
-        <Card 
+        <Card
           className="fixed left-5 bottom-[76px] z-50 w-[360px] h-[60vh] flex flex-col shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-200"
           data-testid="chat-drawer"
         >
@@ -131,17 +215,15 @@ export function ChatLauncher() {
               {messages.map(message => (
                 <div
                   key={message.id}
-                  className={`flex gap-3 ${
-                    message.role === "user" ? "flex-row-reverse" : ""
-                  }`}
+                  className={`flex gap-3 ${message.role === "user" ? "flex-row-reverse" : ""
+                    }`}
                   data-testid={`message-${message.id}`}
                 >
                   <div
-                    className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center ${
-                      message.role === "user"
+                    className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center ${message.role === "user"
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted"
-                    }`}
+                      }`}
                   >
                     {message.role === "user" ? (
                       <User className="w-4 h-4" />
@@ -150,11 +232,10 @@ export function ChatLauncher() {
                     )}
                   </div>
                   <div
-                    className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                      message.role === "user"
+                    className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${message.role === "user"
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted text-foreground"
-                    }`}
+                      }`}
                   >
                     {message.content}
                   </div>
@@ -176,11 +257,15 @@ export function ChatLauncher() {
               />
               <Button
                 onClick={sendMessage}
-                disabled={!inputValue.trim()}
+                disabled={!inputValue.trim() || isLoading}
                 size="icon"
                 data-testid="button-send-message"
               >
-                <Send className="w-4 h-4" />
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
               </Button>
             </div>
           </div>
@@ -188,23 +273,4 @@ export function ChatLauncher() {
       )}
     </>
   );
-}
-
-function getAssistantResponse(userMessage: string): string {
-  const lowerMessage = userMessage.toLowerCase();
-
-  if (lowerMessage.includes("결정") || lowerMessage.includes("decision")) {
-    return "현재 프로젝트에서 3개의 주요 결정이 기록되어 있습니다. Overview 페이지에서 전체 결정 목록을 확인하실 수 있습니다.";
-  }
-  if (lowerMessage.includes("미팅") || lowerMessage.includes("회의")) {
-    return "최근 미팅 기록은 Meetings 페이지에서 확인하실 수 있습니다. 새로운 미팅을 녹음하려면 사이드바의 '녹음하기' 버튼을 사용해주세요.";
-  }
-  if (lowerMessage.includes("근거") || lowerMessage.includes("evidence")) {
-    return "Evidence 페이지에서 프로젝트의 모든 근거 자료를 관리할 수 있습니다. 파일 업로드도 가능합니다.";
-  }
-  if (lowerMessage.includes("도움") || lowerMessage.includes("help")) {
-    return "TRACE PM은 프로젝트 결정과 근거를 추적하는 도구입니다. 미팅 녹음, 결정 기록, 근거 관리 등의 기능을 제공합니다. 어떤 부분이 궁금하신가요?";
-  }
-
-  return "네, 알겠습니다. 더 자세한 정보가 필요하시면 말씀해 주세요. Overview, Meetings, Evidence 페이지에서 프로젝트 정보를 확인하실 수 있습니다.";
 }

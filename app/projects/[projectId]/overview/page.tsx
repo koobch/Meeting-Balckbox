@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProjectName } from "@/lib/project-context";
 import { InlineEditableText } from "@/components/inline-editable-text";
@@ -13,12 +13,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { 
-  Lightbulb, 
-  Calendar, 
-  AlertCircle, 
-  FileText, 
-  Link2, 
+import {
+  Lightbulb,
+  Calendar,
+  AlertCircle,
+  FileText,
+  Link2,
   ChevronRight,
   ChevronLeft,
   Zap,
@@ -31,8 +31,12 @@ import {
   CircleSlash,
   ExternalLink,
   ArrowUpDown,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Loader2,
+  Check,
+  Database
 } from "lucide-react";
+import { getProjectOverview } from "@/app/actions/meetings";
 
 type Status = "draft" | "integrated";
 type EvidenceStrength = "strong" | "medium" | "weak";
@@ -107,182 +111,16 @@ interface CalendarDay {
   } | null;
 }
 
-const keywords = [
-  "사용자 인터뷰",
-  "시장 분석",
-  "기술 검토",
-  "UX 리서치",
-  "경쟁사 분석",
-  "MVP 정의",
-  "로드맵",
-  "KPI"
-];
+// Hardcoded data removed - now handled by state
 
-const decisions: DecisionData[] = [
-  {
-    id: "dec-1",
-    title: "MVP 범위를 핵심 3개 기능으로 제한",
-    description: "초기 출시 시간을 단축하기 위해 사용자 인증, 대시보드, 리포팅 기능만 포함하기로 결정",
-    status: "integrated",
-    strength: "strong",
-    evidenceCount: 12,
-    segmentCount: 8,
-    createdAt: "2025-01-28",
-    tags: ["MVP 정의", "로드맵"],
-    hasLogicFlag: false
-  },
-  {
-    id: "dec-2",
-    title: "React + TypeScript 기술 스택 선정",
-    description: "팀의 기술 역량과 생태계 지원을 고려하여 프론트엔드 기술 스택 결정",
-    status: "integrated",
-    strength: "strong",
-    evidenceCount: 8,
-    segmentCount: 5,
-    createdAt: "2025-01-25",
-    tags: ["기술 검토"],
-    hasLogicFlag: false
-  },
-  {
-    id: "dec-3",
-    title: "B2B SaaS 비즈니스 모델 채택",
-    description: "시장 조사 결과를 바탕으로 구독형 B2B 모델이 가장 적합하다고 판단",
-    status: "draft",
-    strength: "medium",
-    evidenceCount: 6,
-    segmentCount: 4,
-    createdAt: "2025-01-30",
-    tags: ["시장 분석", "경쟁사 분석"],
-    hasLogicFlag: true
-  }
-];
-
-const meetings: MeetingData[] = [
-  {
-    id: "meet-1",
-    title: "사용자 인터뷰 결과 공유 미팅",
-    date: "2025-01-29",
-    participants: ["김연구", "이디자인", "박개발"],
-    status: "integrated",
-    strength: "strong",
-    evidenceCount: 15,
-    segmentCount: 22,
-    keyPoints: ["핵심 페인포인트 3가지 도출", "우선순위 재정의 필요"],
-    hasLogicFlag: false
-  },
-  {
-    id: "meet-2",
-    title: "스프린트 계획 회의",
-    date: "2025-01-27",
-    participants: ["박개발", "최PM", "정QA"],
-    status: "draft",
-    strength: "medium",
-    evidenceCount: 4,
-    segmentCount: 7,
-    keyPoints: ["2주 스프린트 사이클 확정", "일일 스탠드업 10AM"],
-    hasLogicFlag: true
-  }
-];
-
-const gaps: GapData[] = [
-  {
-    id: "gap-1",
-    title: "가격 정책에 대한 근거 부족",
-    description: "경쟁사 대비 가격 책정 전략에 대한 데이터 검증이 필요함",
-    status: "draft",
-    strength: "weak",
-    evidenceCount: 2,
-    segmentCount: 1,
-    priority: "high",
-    relatedDecisions: ["B2B SaaS 비즈니스 모델 채택"],
-    hasLogicFlag: true
-  },
-  {
-    id: "gap-2",
-    title: "확장성 테스트 미완료",
-    description: "예상 사용자 수 대비 시스템 부하 테스트가 진행되지 않음",
-    status: "draft",
-    strength: "weak",
-    evidenceCount: 1,
-    segmentCount: 0,
-    priority: "medium",
-    relatedDecisions: ["React + TypeScript 기술 스택 선정"],
-    hasLogicFlag: false
-  }
-];
-
-const liveBrief = {
-  currentGoal: "MVP 1차 버전 2월 15일까지 출시",
-  latestDecision: "B2B SaaS 구독 모델 채택 검토 중",
-  weeklyRisk: "가격 정책 근거 부족으로 출시 지연 가능성"
-};
-
-const actionItems: ActionItem[] = [
-  { id: "act-1", title: "경쟁사 가격 조사 완료", assignee: "김연구", completed: true },
-  { id: "act-2", title: "사용자 페르소나 문서 업데이트", assignee: "이디자인", completed: false },
-  { id: "act-3", title: "API 스펙 문서 작성", assignee: "박개발", completed: false },
-  { id: "act-4", title: "QA 테스트 계획 수립", assignee: "정QA", completed: false },
-  { id: "act-5", title: "스프린트 회고 준비", assignee: "최PM", completed: true }
-];
-
-const evidenceDrops: EvidenceDrop[] = [
-  {
-    id: "ev-1",
-    title: "2025 SaaS 시장 트렌드 리포트",
-    summary: "B2B SaaS 시장 연 23% 성장 전망, AI 통합이 핵심 차별화 요소로 부상",
-    source: "Gartner",
-    addedAt: "2시간 전"
-  },
-  {
-    id: "ev-2",
-    title: "경쟁사 A사 신규 기능 출시",
-    summary: "실시간 협업 기능 추가, 기존 대비 30% 가격 인상 없이 제공",
-    source: "TechCrunch",
-    addedAt: "5시간 전"
-  },
-  {
-    id: "ev-3",
-    title: "사용자 인터뷰 녹취록 #12",
-    summary: "중소기업 PM 대상, 기존 도구의 복잡성이 가장 큰 불만 사항",
-    source: "Internal",
-    addedAt: "1일 전"
-  }
-];
-
-const meetingsData: Record<string, Record<number, { 
-  meetingId: string; 
-  meetingTitle: string;
-  todoStats: { total: number; completed: number };
-}>> = {
-  "2026-0": {
-    6: { meetingId: "m1", meetingTitle: "킥오프 미팅", todoStats: { total: 3, completed: 3 } },
-    10: { meetingId: "m2", meetingTitle: "기술 스택 논의", todoStats: { total: 4, completed: 4 } },
-    15: { meetingId: "m3", meetingTitle: "사용자 리서치 리뷰", todoStats: { total: 5, completed: 2 } },
-    20: { meetingId: "m4", meetingTitle: "MVP 범위 확정", todoStats: { total: 6, completed: 6 } },
-    22: { meetingId: "m5", meetingTitle: "디자인 리뷰", todoStats: { total: 4, completed: 1 } },
-    25: { meetingId: "m6", meetingTitle: "스프린트 계획", todoStats: { total: 3, completed: 0 } },
-    29: { meetingId: "m7", meetingTitle: "가격 정책 논의", todoStats: { total: 5, completed: 0 } }
-  },
-  "2025-11": {
-    5: { meetingId: "m8", meetingTitle: "연말 리뷰", todoStats: { total: 2, completed: 2 } },
-    12: { meetingId: "m9", meetingTitle: "로드맵 계획", todoStats: { total: 3, completed: 1 } },
-    18: { meetingId: "m10", meetingTitle: "팀 회고", todoStats: { total: 4, completed: 4 } }
-  },
-  "2026-1": {
-    3: { meetingId: "m11", meetingTitle: "2월 계획 회의", todoStats: { total: 3, completed: 0 } },
-    14: { meetingId: "m12", meetingTitle: "밸런타인 스프린트", todoStats: { total: 5, completed: 2 } },
-    21: { meetingId: "m13", meetingTitle: "기능 리뷰", todoStats: { total: 4, completed: 3 } }
-  }
-};
-
-function generateCalendarData(year: number, month: number): CalendarDay[] {
+function generateCalendarData(year: number, month: number, meetingsData: any): CalendarDay[] {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfWeek = new Date(year, month, 1).getDay();
-  
+
   const meetingsMap = meetingsData[`${year}-${month}`] || {};
-  
+
   const days: CalendarDay[] = [];
-  
+
   for (let i = 0; i < firstDayOfWeek; i++) {
     days.push({
       date: "",
@@ -293,7 +131,7 @@ function generateCalendarData(year: number, month: number): CalendarDay[] {
       todoStats: null
     });
   }
-  
+
   for (let day = 1; day <= daysInMonth; day++) {
     const meeting = meetingsMap[day];
     days.push({
@@ -305,18 +143,18 @@ function generateCalendarData(year: number, month: number): CalendarDay[] {
       todoStats: meeting?.todoStats || null
     });
   }
-  
+
   return days;
 }
 
-function MeetingIntegrationCalendar({ projectId }: { projectId: string }) {
+function MeetingIntegrationCalendar({ projectId, meetingsData }: { projectId: string; meetingsData: any }) {
   const router = useRouter();
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonth, setCurrentMonth] = useState(0);
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const weekDays = ["일", "월", "화", "수", "목", "금", "토"];
-  
-  const calendarData = useMemo(() => generateCalendarData(currentYear, currentMonth), [currentYear, currentMonth]);
-  
+
+  const calendarData = useMemo(() => generateCalendarData(currentYear, currentMonth, meetingsData), [currentYear, currentMonth, meetingsData]);
+
   const goToPreviousMonth = () => {
     if (currentMonth === 0) {
       setCurrentYear(currentYear - 1);
@@ -325,7 +163,7 @@ function MeetingIntegrationCalendar({ projectId }: { projectId: string }) {
       setCurrentMonth(currentMonth - 1);
     }
   };
-  
+
   const goToNextMonth = () => {
     if (currentMonth === 11) {
       setCurrentYear(currentYear + 1);
@@ -334,12 +172,12 @@ function MeetingIntegrationCalendar({ projectId }: { projectId: string }) {
       setCurrentMonth(currentMonth + 1);
     }
   };
-  
+
   const getCompletionRate = (day: CalendarDay): number => {
     if (!day.todoStats || day.todoStats.total === 0) return 0;
     return (day.todoStats.completed / day.todoStats.total) * 100;
   };
-  
+
   const getStatusColor = (day: CalendarDay) => {
     if (!day.hasMeeting || !day.todoStats) return "bg-muted/50 text-muted-foreground";
     const rate = getCompletionRate(day);
@@ -347,7 +185,7 @@ function MeetingIntegrationCalendar({ projectId }: { projectId: string }) {
     if (rate > 0) return "bg-amber-400 text-white";
     return "bg-red-500 text-white";
   };
-  
+
   const getStatusLabel = (day: CalendarDay) => {
     if (!day.todoStats) return "";
     const rate = getCompletionRate(day);
@@ -355,13 +193,13 @@ function MeetingIntegrationCalendar({ projectId }: { projectId: string }) {
     if (rate > 0) return `${Math.round(rate)}% 완료`;
     return "미완료";
   };
-  
+
   const handleDayClick = (day: CalendarDay) => {
     if (day.hasMeeting && day.meetingId) {
       router.push(`/projects/${projectId}/meetings/${day.meetingId}`);
     }
   };
-  
+
   return (
     <Card data-testid="card-meeting-calendar">
       <CardHeader className="pb-3">
@@ -371,18 +209,18 @@ function MeetingIntegrationCalendar({ projectId }: { projectId: string }) {
             진행 사항 확인 캘린더
           </CardTitle>
           <div className="flex items-center gap-1">
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={goToPreviousMonth}
               data-testid="button-prev-month"
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <span className="text-xs text-muted-foreground min-w-[70px] text-center">{currentYear}년 {currentMonth + 1}월</span>
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={goToNextMonth}
               data-testid="button-next-month"
             >
@@ -422,10 +260,9 @@ function MeetingIntegrationCalendar({ projectId }: { projectId: string }) {
                       <div className="text-xs text-muted-foreground space-y-0.5">
                         <p>할 일 {day.todoStats.completed}/{day.todoStats.total}개 완료</p>
                       </div>
-                      <p className={`text-xs font-medium ${
-                        getCompletionRate(day) === 100 ? 'text-emerald-600' :
+                      <p className={`text-xs font-medium ${getCompletionRate(day) === 100 ? 'text-emerald-600' :
                         getCompletionRate(day) > 0 ? 'text-amber-600' : 'text-red-600'
-                      }`}>
+                        }`}>
                         {getStatusLabel(day)}
                       </p>
                     </div>
@@ -462,8 +299,8 @@ function StatusBadge({ status }: { status: Status }) {
   return (
     <Badge
       variant={status === "integrated" ? "default" : "outline"}
-      className={status === "integrated" 
-        ? "bg-emerald-500 text-white border-transparent" 
+      className={status === "integrated"
+        ? "bg-emerald-500 text-white border-transparent"
         : "text-muted-foreground"
       }
       data-testid={`badge-status-${status}`}
@@ -479,10 +316,10 @@ function StrengthBadge({ strength }: { strength: EvidenceStrength }) {
     medium: { label: "보통", className: "bg-amber-50 text-amber-700 border-amber-200" },
     weak: { label: "약함", className: "bg-red-50 text-red-700 border-red-200" }
   };
-  
+
   return (
-    <Badge 
-      variant="outline" 
+    <Badge
+      variant="outline"
       className={config[strength].className}
       data-testid={`badge-strength-${strength}`}
     >
@@ -609,8 +446,8 @@ function GapItem({ gap, onComplete }: { gap: GapData; onComplete: (id: string) =
   };
 
   return (
-    <div 
-      className="p-3 rounded-md hover-elevate transition-colors border border-border border-dashed overflow-visible" 
+    <div
+      className="p-3 rounded-md hover-elevate transition-colors border border-border border-dashed overflow-visible"
       data-testid={`card-gap-${gap.id}`}
     >
       <div className="flex items-start justify-between gap-3 mb-2">
@@ -635,9 +472,9 @@ function GapItem({ gap, onComplete }: { gap: GapData; onComplete: (id: string) =
             </Badge>
           )}
         </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => onComplete(gap.id)}
           data-testid={`button-complete-gap-${gap.id}`}
         >
@@ -649,7 +486,12 @@ function GapItem({ gap, onComplete }: { gap: GapData; onComplete: (id: string) =
   );
 }
 
-function LiveBriefCard() {
+function LiveBriefCard({ meetings }: { meetings: MeetingData[] }) {
+  const latestMeeting = meetings[0];
+  const currentGoal = "MVP 1차 버전 2월 15일까지 출시"; // Still hardcoded for now or from project desc
+  const latestDecision = latestMeeting ? latestMeeting.keyPoints[0] || "데이터 분석 중" : "데이터 없음";
+  const weeklyRisk = "일정 및 리소스 확인 필요";
+
   return (
     <Card className="border-2 border-primary/20 bg-primary/5" data-testid="card-live-brief">
       <CardHeader className="pb-3">
@@ -663,26 +505,31 @@ function LiveBriefCard() {
       <CardContent className="space-y-4">
         <div>
           <p className="text-sm text-muted-foreground mb-1">현재 목표</p>
-          <p className="text-lg font-semibold text-foreground">{liveBrief.currentGoal}</p>
+          <p className="text-lg font-semibold text-foreground">{currentGoal}</p>
         </div>
         <div>
-          <p className="text-sm text-muted-foreground mb-1">최신 결정</p>
-          <p className="text-base text-foreground">{liveBrief.latestDecision}</p>
+          <p className="text-sm text-muted-foreground mb-1">최근 미팅 주요 내용</p>
+          <p className="text-base text-foreground">{latestDecision}</p>
         </div>
         <div>
-          <p className="text-sm text-muted-foreground mb-1">이번 주 리스크</p>
-          <p className="text-base font-medium text-orange-600">{liveBrief.weeklyRisk}</p>
+          <p className="text-sm text-muted-foreground mb-1">상태</p>
+          <p className="text-base font-medium text-blue-600">{latestMeeting ? '기록 있음' : '기록 없음'}</p>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function ActionItemsCard() {
-  const [items, setItems] = useState(actionItems);
-  
-  const toggleItem = (id: string) => {
-    setItems(prev => prev.map(item => 
+function ActionItemsCard({ actionItems }: { actionItems: ActionItem[] }) {
+  const [items, setItems] = useState<ActionItem[]>([]);
+
+  useEffect(() => {
+    setItems(actionItems);
+  }, [actionItems]);
+
+  const toggleItem = (id: string | number) => {
+    // Optimistic UI update could go here
+    setItems(prev => prev.map(item =>
       item.id === id ? { ...item, completed: !item.completed } : item
     ));
   };
@@ -702,14 +549,14 @@ function ActionItemsCard() {
         <ul className="space-y-2 max-h-[200px] overflow-y-auto">
           {items.map(item => (
             <li key={item.id} className="flex items-start gap-2">
-              <Checkbox 
+              <Checkbox
                 id={item.id}
                 checked={item.completed}
                 onCheckedChange={() => toggleItem(item.id)}
                 className="mt-0.5"
                 data-testid={`checkbox-action-${item.id}`}
               />
-              <label 
+              <label
                 htmlFor={item.id}
                 className={`text-sm flex-1 cursor-pointer ${item.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}
               >
@@ -723,14 +570,18 @@ function ActionItemsCard() {
   );
 }
 
-function DecisionIntegrityCard({ 
-  activeFilter, 
+function DecisionIntegrityCard({
+  activeFilter,
   onFilterChange,
-  gapsData 
-}: { 
-  activeFilter: FilterType; 
+  gapsData,
+  decisions,
+  meetings
+}: {
+  activeFilter: FilterType;
   onFilterChange: (filter: FilterType) => void;
   gapsData: GapData[];
+  decisions: DecisionData[];
+  meetings: MeetingData[];
 }) {
   const allItems = [...decisions, ...meetings, ...gapsData];
   const weakCount = allItems.filter(item => item.strength === "weak").length;
@@ -753,9 +604,8 @@ function DecisionIntegrityCard({
         <div className="space-y-2">
           <button
             onClick={() => handleClick("weak")}
-            className={`w-full flex items-center justify-between p-2 rounded-md text-sm transition-all hover-elevate ${
-              activeFilter === "weak" ? "bg-red-50 border border-red-200" : "hover:bg-muted"
-            }`}
+            className={`w-full flex items-center justify-between p-2 rounded-md text-sm transition-all hover-elevate ${activeFilter === "weak" ? "bg-red-50 border border-red-200" : "hover:bg-muted"
+              }`}
             data-testid="filter-weak"
           >
             <span className="flex items-center gap-2">
@@ -768,12 +618,11 @@ function DecisionIntegrityCard({
               {weakCount}
             </Badge>
           </button>
-          
+
           <button
             onClick={() => handleClick("logic-flags")}
-            className={`w-full flex items-center justify-between p-2 rounded-md text-sm transition-all hover-elevate ${
-              activeFilter === "logic-flags" ? "bg-yellow-50 border border-yellow-200" : "hover:bg-muted"
-            }`}
+            className={`w-full flex items-center justify-between p-2 rounded-md text-sm transition-all hover-elevate ${activeFilter === "logic-flags" ? "bg-yellow-50 border border-yellow-200" : "hover:bg-muted"
+              }`}
             data-testid="filter-logic-flags"
           >
             <span className="flex items-center gap-2">
@@ -786,12 +635,11 @@ function DecisionIntegrityCard({
               {logicFlagCount}
             </Badge>
           </button>
-          
+
           <button
             onClick={() => handleClick("missing-evidence")}
-            className={`w-full flex items-center justify-between p-2 rounded-md text-sm transition-all hover-elevate ${
-              activeFilter === "missing-evidence" ? "bg-orange-50 border border-orange-200" : "hover:bg-muted"
-            }`}
+            className={`w-full flex items-center justify-between p-2 rounded-md text-sm transition-all hover-elevate ${activeFilter === "missing-evidence" ? "bg-orange-50 border border-orange-200" : "hover:bg-muted"
+              }`}
             data-testid="filter-missing-evidence"
           >
             <span className="flex items-center gap-2">
@@ -810,7 +658,15 @@ function DecisionIntegrityCard({
   );
 }
 
-function EvidenceDropsCard() {
+function EvidenceDropsCard({ meetings }: { meetings: MeetingData[] }) {
+  const evidenceDrops: EvidenceDrop[] = meetings.map(m => ({
+    id: `ev-${m.id}`,
+    title: `${m.title} 녹취록`,
+    summary: (m.keyPoints || []).join(', ').substring(0, 100),
+    source: "Internal",
+    addedAt: m.date
+  })).slice(0, 5);
+
   return (
     <Card data-testid="card-evidence-drops">
       <CardHeader className="pb-2">
@@ -872,11 +728,10 @@ function FilterSortBar({
           <button
             key={btn.key}
             onClick={() => onStatusFilterChange(statusFilter === btn.key ? null : btn.key)}
-            className={`px-2.5 py-1 text-xs rounded-md transition-all ${
-              statusFilter === btn.key
-                ? "bg-foreground text-background font-medium"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-            }`}
+            className={`px-2.5 py-1 text-xs rounded-md transition-all ${statusFilter === btn.key
+              ? "bg-foreground text-background font-medium"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
             data-testid={`filter-${btn.key}`}
           >
             {btn.label}
@@ -890,22 +745,20 @@ function FilterSortBar({
         <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground mr-1" />
         <button
           onClick={() => onSortChange("recent")}
-          className={`px-2.5 py-1 text-xs rounded-md transition-all ${
-            sortType === "recent"
-              ? "bg-foreground text-background font-medium"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted"
-          }`}
+          className={`px-2.5 py-1 text-xs rounded-md transition-all ${sortType === "recent"
+            ? "bg-foreground text-background font-medium"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            }`}
           data-testid="sort-recent"
         >
           Recent
         </button>
         <button
           onClick={() => onSortChange("risk")}
-          className={`px-2.5 py-1 text-xs rounded-md transition-all ${
-            sortType === "risk"
-              ? "bg-foreground text-background font-medium"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted"
-          }`}
+          className={`px-2.5 py-1 text-xs rounded-md transition-all ${sortType === "risk"
+            ? "bg-foreground text-background font-medium"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            }`}
           data-testid="sort-risk"
         >
           Risk first
@@ -944,13 +797,99 @@ function FilterSortBar({
 
 export default function ProjectOverview() {
   const params = useParams();
+  const projectId = params.projectId as string;
+
+  const [isLoading, setIsLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<FilterType>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
   const [sortType, setSortType] = useState<SortType>("recent");
   const [visibility, setVisibility] = useState<CardVisibility>({ decisions: true, meetings: true });
-  const [gapsData, setGapsData] = useState<GapData[]>(gaps);
 
-  const projectId = params.projectId as string;
+  const [decisionsState, setDecisionsState] = useState<DecisionData[]>([]);
+  const [meetingsState, setMeetingsState] = useState<MeetingData[]>([]);
+  const [gapsData, setGapsData] = useState<GapData[]>([]);
+  const [actionItemsState, setActionItemsState] = useState<ActionItem[]>([]);
+  const [meetingsCalendarData, setMeetingsCalendarData] = useState<any>({});
+
+  useEffect(() => {
+    async function fetchOverview() {
+      if (!projectId) return;
+      setIsLoading(true);
+      try {
+        const result = await getProjectOverview(projectId);
+        if (result.success && result.data) {
+          const { meetings, decisions, actionItems, logicGaps } = result.data;
+
+          setMeetingsState(meetings.map((m: any) => ({
+            id: m.id,
+            title: m.title,
+            date: m.meeting_date ? new Date(m.meeting_date).toISOString().split('T')[0] : "-",
+            participants: m.participants || [],
+            status: "integrated",
+            strength: "strong",
+            evidenceCount: 1,
+            segmentCount: 5,
+            keyPoints: m.topics || [],
+            hasLogicFlag: false
+          })));
+
+          setDecisionsState(decisions.map((d: any) => ({
+            id: d.id,
+            title: d.content,
+            description: d.reasoning || "",
+            status: d.is_integrated ? "integrated" : "draft",
+            strength: "strong",
+            evidenceCount: 1,
+            segmentCount: 1,
+            createdAt: new Date(d.created_at).toISOString().split('T')[0],
+            tags: [],
+            hasLogicFlag: false
+          })));
+
+          setGapsData(logicGaps.map((g: any) => ({
+            id: g.id,
+            title: g.claim,
+            description: g.gap,
+            status: g.review_status === "completed" ? "integrated" : "draft",
+            strength: "weak",
+            evidenceCount: 1,
+            segmentCount: 0,
+            priority: "high",
+            relatedDecisions: [],
+            hasLogicFlag: true
+          })));
+
+          setActionItemsState(actionItems.map((ai: any) => ({
+            id: ai.id,
+            title: ai.task,
+            assignee: ai.assignee || "미지정",
+            completed: ai.status === "completed"
+          })));
+
+          // Format meetings for calendar
+          const cal: any = {};
+          meetings.forEach((m: any) => {
+            if (m.meeting_date) {
+              const d = new Date(m.meeting_date);
+              const key = `${d.getFullYear()}-${d.getMonth()}`;
+              if (!cal[key]) cal[key] = {};
+              cal[key][d.getDate()] = {
+                meetingId: m.id,
+                meetingTitle: m.title,
+                todoStats: { total: 0, completed: 0 }
+              };
+            }
+          });
+          setMeetingsCalendarData(cal);
+        }
+      } catch (error) {
+        console.error("Failed to load overview:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchOverview();
+  }, [projectId]);
 
   const handleCompleteGap = (gapId: string) => {
     setGapsData(prev => prev.filter(gap => gap.id !== gapId));
@@ -966,9 +905,9 @@ export default function ProjectOverview() {
     return score;
   };
 
-  const filterAndSortItems = <T extends { 
-    strength: EvidenceStrength; 
-    evidenceCount: number; 
+  const filterAndSortItems = <T extends {
+    strength: EvidenceStrength;
+    evidenceCount: number;
     hasLogicFlag?: boolean;
     status: Status;
     createdAt?: string;
@@ -976,7 +915,7 @@ export default function ProjectOverview() {
     priority?: string;
   }>(items: T[]): T[] => {
     let result = [...items];
-    
+
     if (activeFilter) {
       switch (activeFilter) {
         case "weak":
@@ -1018,26 +957,26 @@ export default function ProjectOverview() {
     return result;
   };
 
-  const filteredDecisions = useMemo(() => 
-    visibility.decisions ? filterAndSortItems(decisions) : [], 
-    [activeFilter, statusFilter, sortType, visibility.decisions]
+  const filteredDecisions = useMemo(() =>
+    visibility.decisions ? filterAndSortItems(decisionsState) : [],
+    [activeFilter, statusFilter, sortType, visibility.decisions, decisionsState]
   );
-  
-  const filteredMeetings = useMemo(() => 
-    visibility.meetings ? filterAndSortItems(meetings) : [], 
-    [activeFilter, statusFilter, sortType, visibility.meetings]
+
+  const filteredMeetings = useMemo(() =>
+    visibility.meetings ? filterAndSortItems(meetingsState) : [],
+    [activeFilter, statusFilter, sortType, visibility.meetings, meetingsState]
   );
-  
-  const filteredGaps = useMemo(() => 
-    filterAndSortItems(gaps), 
-    [activeFilter, statusFilter, sortType]
+
+  const filteredGaps = useMemo(() =>
+    filterAndSortItems(gapsData),
+    [activeFilter, statusFilter, sortType, gapsData]
   );
 
   const hasResults = filteredDecisions.length > 0 || filteredMeetings.length > 0 || filteredGaps.length > 0;
   const hasActiveFilters = activeFilter !== null || statusFilter !== null;
-  
+
   const [projectName, setProjectName] = useProjectName(projectId || "1");
-  
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
       <header className="flex-shrink-0 border-b border-border bg-muted/30">
@@ -1052,37 +991,99 @@ export default function ProjectOverview() {
           <p className="text-sm text-muted-foreground">Overview</p>
         </div>
       </header>
-      
-      <div className="flex-1 overflow-auto px-6 py-6">
-        <div className="space-y-4" data-testid="section-top-row">
-          <div className="grid grid-cols-2 gap-4">
-            <LiveBriefCard />
-            <ActionItemsCard />
+
+      <div className="flex-1 overflow-auto px-6 py-6 font-sans">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="animate-pulse">프로젝트 데이터를 분석하는 중입니다...</p>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <MeetingIntegrationCalendar projectId={projectId || "1"} />
-            <Card data-testid="card-gaps">
-              <CardHeader className="py-3 px-4 border-b border-border">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-orange-600" />
-                  보완 필요 항목
-                  <Badge variant="secondary" className="ml-2">{gapsData.length}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                {gapsData.length > 0 ? (
-                  <div className="space-y-3 max-h-[300px] overflow-y-auto" data-testid="list-gaps">
-                    {gapsData.map(gap => (
-                      <GapItem key={gap.id} gap={gap} onComplete={handleCompleteGap} />
-                    ))}
+        ) : (
+          <div className="space-y-4" data-testid="section-top-row">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-8 flex flex-col gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <LiveBriefCard meetings={meetingsState} />
+                  <ActionItemsCard actionItems={actionItemsState} />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <MeetingIntegrationCalendar projectId={projectId || "1"} meetingsData={meetingsCalendarData} />
+                  <Card data-testid="card-gaps" className="flex flex-col">
+                    <CardHeader className="py-3 px-4 border-b border-border">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-orange-600" />
+                        보완 필요 항목
+                        <Badge variant="secondary" className="ml-2">{gapsData.length}</Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 flex-1">
+                      {gapsData.length > 0 ? (
+                        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1" data-testid="list-gaps">
+                          {gapsData.map(gap => (
+                            <GapItem key={gap.id} gap={gap} onComplete={handleCompleteGap} />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                          <Check className="w-10 h-10 text-emerald-500 mb-2 opacity-50" />
+                          <p className="text-sm">현재 보완할 항목이 없습니다.</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Decisions & Meetings Feed */}
+                <div className="space-y-6 pt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Database className="w-5 h-5 text-primary" />
+                      <h2 className="text-lg font-bold text-foreground">Project Updates</h2>
+                    </div>
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-4">보완 필요 항목이 없습니다.</p>
-                )}
-              </CardContent>
-            </Card>
+
+                  <FilterSortBar
+                    statusFilter={statusFilter}
+                    onStatusFilterChange={setStatusFilter}
+                    sortType={sortType}
+                    onSortChange={setSortType}
+                    visibility={visibility}
+                    onVisibilityChange={setVisibility}
+                  />
+
+                  {!hasResults ? (
+                    <div className="flex flex-col items-center justify-center py-32 border-2 border-dashed border-border rounded-xl bg-muted/20">
+                      <Inbox className="w-12 h-12 text-muted-foreground mb-4 opacity-30" />
+                      <p className="text-lg font-medium text-foreground">No updates found</p>
+                      <p className="text-sm text-muted-foreground mt-1">Try changing filters or adding new meetings</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {filteredDecisions.map(decision => (
+                        <DecisionCard key={decision.id} decision={decision} />
+                      ))}
+                      {filteredMeetings.map(meeting => (
+                        <MeetingCard key={meeting.id} meeting={meeting} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="lg:col-span-4 flex flex-col gap-6">
+                <DecisionIntegrityCard
+                  activeFilter={activeFilter}
+                  onFilterChange={setActiveFilter}
+                  gapsData={gapsData}
+                  decisions={decisionsState}
+                  meetings={meetingsState}
+                />
+                <EvidenceDropsCard meetings={meetingsState} />
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

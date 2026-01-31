@@ -218,3 +218,55 @@ export async function integrateMeetingItems(items: any[]) {
         return { success: false, error: error.message };
     }
 }
+
+export async function getProjectOverview(projectId: string) {
+    try {
+        // 1. Fetch all meetings for this project
+        const { data: meetings, error: meetingsError } = await supabase
+            .from('meetings')
+            .select('*')
+            .eq('project_id', projectId)
+            .order('meeting_date', { ascending: false });
+
+        if (meetingsError) throw meetingsError;
+
+        const meetingIds = meetings.map(m => m.id);
+
+        // 2. Fetch all decisions for these meetings
+        const { data: decisions, error: decisionsError } = await supabase
+            .from('decisions')
+            .select('*')
+            .in('meeting_id', meetingIds);
+
+        if (decisionsError) throw decisionsError;
+
+        // 3. Fetch all action items for these meetings
+        const { data: actionItems, error: actionItemsError } = await supabase
+            .from('action_items')
+            .select('*')
+            .in('meeting_id', meetingIds);
+
+        if (actionItemsError) throw actionItemsError;
+
+        // 4. Fetch all logic gaps for these meetings
+        const { data: logicGaps, error: logicGapsError } = await supabase
+            .from('logic_gaps')
+            .select('*')
+            .in('meeting_id', meetingIds);
+
+        if (logicGapsError) throw logicGapsError;
+
+        return {
+            success: true,
+            data: {
+                meetings,
+                decisions,
+                actionItems,
+                logicGaps
+            }
+        };
+    } catch (error: any) {
+        console.error('Failed to fetch project overview:', error);
+        return { success: false, error: error.message };
+    }
+}
