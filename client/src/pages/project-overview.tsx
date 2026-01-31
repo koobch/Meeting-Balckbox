@@ -95,14 +95,11 @@ interface CalendarDay {
   date: string;
   day: number;
   hasMeeting: boolean;
-  integrationStatus: "integrated" | "partial" | "not" | null;
   meetingId: string | null;
   meetingTitle: string | null;
-  summary: {
-    decisionsCount: number;
-    integratedDecisions: number;
-    evidenceCount: number;
-    missingEvidence: number;
+  todoStats: {
+    total: number;
+    completed: number;
   } | null;
 }
 
@@ -257,50 +254,42 @@ function generateCalendarData(): CalendarDay[] {
   const meetingsMap: Record<number, { 
     meetingId: string; 
     meetingTitle: string;
-    status: "integrated" | "partial" | "not"; 
-    summary: CalendarDay["summary"];
+    todoStats: { total: number; completed: number };
   }> = {
     6: { 
       meetingId: "m1", 
       meetingTitle: "킥오프 미팅",
-      status: "integrated",
-      summary: { decisionsCount: 3, integratedDecisions: 3, evidenceCount: 8, missingEvidence: 0 }
+      todoStats: { total: 3, completed: 3 }
     },
     10: { 
       meetingId: "m2", 
       meetingTitle: "기술 스택 논의",
-      status: "integrated",
-      summary: { decisionsCount: 2, integratedDecisions: 2, evidenceCount: 5, missingEvidence: 0 }
+      todoStats: { total: 4, completed: 4 }
     },
     15: { 
       meetingId: "m3", 
       meetingTitle: "사용자 리서치 리뷰",
-      status: "partial",
-      summary: { decisionsCount: 4, integratedDecisions: 2, evidenceCount: 6, missingEvidence: 2 }
+      todoStats: { total: 5, completed: 2 }
     },
     20: { 
       meetingId: "m4", 
       meetingTitle: "MVP 범위 확정",
-      status: "integrated",
-      summary: { decisionsCount: 5, integratedDecisions: 5, evidenceCount: 12, missingEvidence: 0 }
+      todoStats: { total: 6, completed: 6 }
     },
     22: { 
       meetingId: "m5", 
       meetingTitle: "디자인 리뷰",
-      status: "partial",
-      summary: { decisionsCount: 3, integratedDecisions: 1, evidenceCount: 4, missingEvidence: 3 }
+      todoStats: { total: 4, completed: 1 }
     },
     25: { 
       meetingId: "m6", 
       meetingTitle: "스프린트 계획",
-      status: "not",
-      summary: { decisionsCount: 2, integratedDecisions: 0, evidenceCount: 1, missingEvidence: 4 }
+      todoStats: { total: 3, completed: 0 }
     },
     29: { 
       meetingId: "m7", 
       meetingTitle: "가격 정책 논의",
-      status: "not",
-      summary: { decisionsCount: 3, integratedDecisions: 0, evidenceCount: 2, missingEvidence: 5 }
+      todoStats: { total: 5, completed: 0 }
     }
   };
   
@@ -311,10 +300,9 @@ function generateCalendarData(): CalendarDay[] {
       date: "",
       day: 0,
       hasMeeting: false,
-      integrationStatus: null,
       meetingId: null,
       meetingTitle: null,
-      summary: null
+      todoStats: null
     });
   }
   
@@ -324,10 +312,9 @@ function generateCalendarData(): CalendarDay[] {
       date: `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
       day,
       hasMeeting: !!meeting,
-      integrationStatus: meeting?.status || null,
       meetingId: meeting?.meetingId || null,
       meetingTitle: meeting?.meetingTitle || null,
-      summary: meeting?.summary || null
+      todoStats: meeting?.todoStats || null
     });
   }
   
@@ -340,23 +327,25 @@ function MeetingIntegrationCalendar({ projectId }: { projectId: string }) {
   const [, setLocation] = useLocation();
   const weekDays = ["일", "월", "화", "수", "목", "금", "토"];
   
-  const getStatusColor = (day: CalendarDay) => {
-    if (!day.hasMeeting) return "bg-muted/50 text-muted-foreground";
-    switch (day.integrationStatus) {
-      case "integrated": return "bg-emerald-500 text-white";
-      case "partial": return "bg-amber-400 text-white";
-      case "not": return "bg-red-500 text-white";
-      default: return "bg-muted/50 text-muted-foreground";
-    }
+  const getCompletionRate = (day: CalendarDay): number => {
+    if (!day.todoStats || day.todoStats.total === 0) return 0;
+    return (day.todoStats.completed / day.todoStats.total) * 100;
   };
   
-  const getStatusLabel = (status: CalendarDay["integrationStatus"]) => {
-    switch (status) {
-      case "integrated": return "완전 통합됨";
-      case "partial": return "부분 통합됨";
-      case "not": return "통합 안됨";
-      default: return "";
-    }
+  const getStatusColor = (day: CalendarDay) => {
+    if (!day.hasMeeting || !day.todoStats) return "bg-muted/50 text-muted-foreground";
+    const rate = getCompletionRate(day);
+    if (rate === 100) return "bg-emerald-500 text-white";
+    if (rate > 0) return "bg-amber-400 text-white";
+    return "bg-red-500 text-white";
+  };
+  
+  const getStatusLabel = (day: CalendarDay) => {
+    if (!day.todoStats) return "";
+    const rate = getCompletionRate(day);
+    if (rate === 100) return "모든 할일 완료";
+    if (rate > 0) return `${Math.round(rate)}% 완료`;
+    return "미완료";
   };
   
   const handleDayClick = (day: CalendarDay) => {
@@ -400,19 +389,18 @@ function MeetingIntegrationCalendar({ projectId }: { projectId: string }) {
                     {day.day}
                   </button>
                 </TooltipTrigger>
-                {day.hasMeeting && day.summary && (
+                {day.hasMeeting && day.todoStats && (
                   <TooltipContent side="top" className="max-w-[200px] p-3">
                     <div className="space-y-1.5">
                       <p className="font-medium text-xs">{day.meetingTitle}</p>
                       <div className="text-xs text-muted-foreground space-y-0.5">
-                        <p>결정 {day.summary.integratedDecisions}/{day.summary.decisionsCount}개 통합</p>
-                        <p>근거 {day.summary.evidenceCount}개 {day.summary.missingEvidence > 0 ? `(${day.summary.missingEvidence}개 부족)` : ''}</p>
+                        <p>할 일 {day.todoStats.completed}/{day.todoStats.total}개 완료</p>
                       </div>
                       <p className={`text-xs font-medium ${
-                        day.integrationStatus === 'integrated' ? 'text-emerald-600' :
-                        day.integrationStatus === 'partial' ? 'text-amber-600' : 'text-red-600'
+                        getCompletionRate(day) === 100 ? 'text-emerald-600' :
+                        getCompletionRate(day) > 0 ? 'text-amber-600' : 'text-red-600'
                       }`}>
-                        {getStatusLabel(day.integrationStatus)}
+                        {getStatusLabel(day)}
                       </p>
                     </div>
                   </TooltipContent>
@@ -424,15 +412,15 @@ function MeetingIntegrationCalendar({ projectId }: { projectId: string }) {
         <div className="flex items-center justify-center gap-4 mt-4 text-xs">
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded bg-emerald-500" />
-            <span className="text-muted-foreground">통합됨</span>
+            <span className="text-muted-foreground">100% 완료</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded bg-amber-400" />
-            <span className="text-muted-foreground">부분 통합</span>
+            <span className="text-muted-foreground">진행 중</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded bg-red-500" />
-            <span className="text-muted-foreground">미통합</span>
+            <span className="text-muted-foreground">미완료</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded bg-muted/50 border border-border" />

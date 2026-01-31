@@ -434,6 +434,11 @@ export default function MeetingDetail() {
   const [selectedActions, setSelectedActions] = useState<Set<string>>(new Set());
   const [commitSuccess, setCommitSuccess] = useState(false);
   
+  const [decisionsSelectMode, setDecisionsSelectMode] = useState(false);
+  const [actionsSelectMode, setActionsSelectMode] = useState(false);
+  const [actionItemsState, setActionItemsState] = useState<ActionItem[]>(actionItemsData);
+  const [decisionSummariesState, setDecisionSummariesState] = useState<DecisionSummary[]>(initialDecisionSummaries);
+  
   const { addToMemory, isItemIntegrated, getIntegrationStatus } = useProjectMemory();
   
   const filteredEvidenceDrops = evidenceDrops.filter(drop => drop.relevantFinding === selectedFinding);
@@ -472,6 +477,30 @@ export default function MeetingDetail() {
     setCommitSuccess(false);
   };
 
+  const deleteDecision = (id: string) => {
+    setDecisionSummariesState(prev => prev.filter(d => d.id !== id));
+    setSelectedDecisions(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  const deleteActionItem = (id: string) => {
+    setActionItemsState(prev => prev.filter(a => a.id !== id));
+    setSelectedActions(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleActionCompletion = (id: string) => {
+    setActionItemsState(prev => prev.map(item => 
+      item.id === id ? { ...item, completed: !item.completed } : item
+    ));
+  };
+
   const totalSelectedCount = selectedDecisions.size + selectedEvidence.size + selectedActions.size;
 
   const handleCommitToMemory = () => {
@@ -479,7 +508,7 @@ export default function MeetingDetail() {
     const now = new Date().toISOString();
 
     selectedDecisions.forEach(id => {
-      const decision = decisionSummaries.find(d => d.id === id);
+      const decision = decisionSummariesState.find(d => d.id === id);
       if (decision) {
         items.push({
           id: `mem-${id}-${Date.now()}`,
@@ -508,7 +537,7 @@ export default function MeetingDetail() {
     });
 
     selectedActions.forEach(id => {
-      const action = actionItemsData.find(a => a.id === id);
+      const action = actionItemsState.find(a => a.id === id);
       if (action) {
         items.push({
           id: `mem-${id}-${Date.now()}`,
@@ -527,6 +556,8 @@ export default function MeetingDetail() {
       setSelectedDecisions(new Set());
       setSelectedEvidence(new Set());
       setSelectedActions(new Set());
+      setDecisionsSelectMode(false);
+      setActionsSelectMode(false);
     }
   };
 
@@ -535,8 +566,8 @@ export default function MeetingDetail() {
   };
 
   const getMeetingIntegrationStatus = (): IntegrationStatus => {
-    const integratedCount = decisionSummaries.filter(d => isItemIntegrated(projectId, d.id)).length;
-    const totalCount = decisionSummaries.length;
+    const integratedCount = decisionSummariesState.filter(d => isItemIntegrated(projectId, d.id)).length;
+    const totalCount = decisionSummariesState.length;
     if (integratedCount === totalCount) return "integrated";
     if (integratedCount > 0) return "partial";
     return "not";
@@ -675,29 +706,39 @@ export default function MeetingDetail() {
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Lightbulb className="w-4 h-4 text-amber-500" />
                   Decisions
-                  <span className={`text-xs px-2 py-0.5 rounded ${integrationStatusConfig[getMeetingIntegrationStatus()].bgColor} ${integrationStatusConfig[getMeetingIntegrationStatus()].color}`}>
-                    {decisionSummaries.filter(d => d.integrationStatus === "integrated").length}/{decisionSummaries.length} 통합
-                  </span>
                   <Badge variant="secondary" className="ml-auto text-xs">
-                    {decisionSummaries.length}
+                    {decisionSummariesState.length}
                   </Badge>
+                  <label className="flex items-center gap-1.5 text-xs font-normal cursor-pointer">
+                    <Checkbox
+                      checked={decisionsSelectMode}
+                      onCheckedChange={(checked) => {
+                        setDecisionsSelectMode(checked === true);
+                        if (!checked) setSelectedDecisions(new Set());
+                      }}
+                      data-testid="checkbox-decisions-select-mode"
+                    />
+                    <span className="text-muted-foreground">통합 선택</span>
+                  </label>
                 </CardTitle>
               </CardHeader>
               <ScrollArea className="h-40">
                 <CardContent className="p-3">
                   <ul className="space-y-2">
-                    {decisionSummaries.map(decision => {
+                    {decisionSummariesState.map(decision => {
                       const itemStatus = getItemStatus(decision.id);
                       const isSelected = selectedDecisions.has(decision.id);
                       const isAlreadyIntegrated = itemStatus === "integrated";
                       return (
-                        <li key={decision.id} className="flex items-center gap-2" data-testid={`decision-${decision.id}`}>
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleDecisionSelection(decision.id)}
-                            disabled={isAlreadyIntegrated}
-                            data-testid={`decision-checkbox-${decision.id}`}
-                          />
+                        <li key={decision.id} className="flex items-center gap-2 group" data-testid={`decision-${decision.id}`}>
+                          {decisionsSelectMode && (
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleDecisionSelection(decision.id)}
+                              disabled={isAlreadyIntegrated}
+                              data-testid={`decision-checkbox-${decision.id}`}
+                            />
+                          )}
                           <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                             decision.status === "confirmed" ? "bg-emerald-500" : 
                             decision.status === "deferred" ? "bg-amber-500" : "bg-slate-400"
@@ -705,19 +746,18 @@ export default function MeetingDetail() {
                           <span className={`text-sm flex-1 ${isAlreadyIntegrated ? "text-muted-foreground" : "text-foreground"}`}>
                             {decision.title}
                           </span>
-                          <span 
-                            className={`text-xs px-2 py-0.5 rounded flex items-center gap-1 ${integrationStatusConfig[itemStatus].bgColor} ${integrationStatusConfig[itemStatus].color}`}
-                            data-testid={`decision-status-${decision.id}`}
-                          >
-                            {itemStatus === "integrated" ? (
+                          {isAlreadyIntegrated && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 flex items-center gap-0.5">
                               <Check className="w-3 h-3" />
-                            ) : itemStatus === "partial" ? (
-                              <CircleDot className="w-3 h-3" />
-                            ) : (
-                              <Circle className="w-3 h-3" />
-                            )}
-                            <span>{integrationStatusConfig[itemStatus].label}</span>
-                          </span>
+                            </span>
+                          )}
+                          <button
+                            onClick={() => deleteDecision(decision.id)}
+                            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+                            data-testid={`button-delete-decision-${decision.id}`}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
                         </li>
                       );
                     })}
@@ -732,35 +772,45 @@ export default function MeetingDetail() {
                   <ListChecks className="w-4 h-4 text-emerald-500" />
                   다음 할 일
                   <Badge variant="secondary" className="ml-auto text-xs">
-                    {actionItemsData.filter(a => a.completed).length}/{actionItemsData.length}
+                    {actionItemsState.filter(a => a.completed).length}/{actionItemsState.length}
                   </Badge>
+                  <label className="flex items-center gap-1.5 text-xs font-normal cursor-pointer">
+                    <Checkbox
+                      checked={actionsSelectMode}
+                      onCheckedChange={(checked) => {
+                        setActionsSelectMode(checked === true);
+                        if (!checked) setSelectedActions(new Set());
+                      }}
+                      data-testid="checkbox-actions-select-mode"
+                    />
+                    <span className="text-muted-foreground">통합 선택</span>
+                  </label>
                 </CardTitle>
               </CardHeader>
               <ScrollArea className="h-40">
                 <CardContent className="p-3">
                   <ul className="space-y-2">
-                    {actionItemsData.map(item => {
+                    {actionItemsState.map(item => {
                       const itemStatus = getItemStatus(item.id);
                       const isSelected = selectedActions.has(item.id);
                       const isAlreadyIntegrated = itemStatus === "integrated";
                       return (
-                        <li key={item.id} className="flex items-start gap-2" data-testid={`action-summary-${item.id}`}>
+                        <li key={item.id} className="flex items-start gap-2 group" data-testid={`action-summary-${item.id}`}>
+                          {actionsSelectMode && (
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleActionSelection(item.id)}
+                              disabled={isAlreadyIntegrated}
+                              className="mt-0.5"
+                              data-testid={`action-integration-checkbox-${item.id}`}
+                            />
+                          )}
                           <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleActionSelection(item.id)}
-                            disabled={isAlreadyIntegrated}
+                            checked={item.completed}
+                            onCheckedChange={() => toggleActionCompletion(item.id)}
                             className="mt-0.5"
-                            data-testid={`action-checkbox-${item.id}`}
+                            data-testid={`action-completion-checkbox-${item.id}`}
                           />
-                          <div className={`w-4 h-4 mt-0.5 rounded border flex-shrink-0 flex items-center justify-center ${
-                            item.completed ? "bg-emerald-500 border-emerald-500" : "border-border"
-                          }`}>
-                            {item.completed && (
-                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </div>
                           <div className="flex-1 min-w-0">
                             <p className={`text-sm ${item.completed ? "line-through text-muted-foreground" : isAlreadyIntegrated ? "text-muted-foreground" : "text-foreground"}`}>
                               {item.task}
@@ -768,11 +818,17 @@ export default function MeetingDetail() {
                             <span className="text-xs text-muted-foreground">{item.assignee}</span>
                           </div>
                           {isAlreadyIntegrated && (
-                            <span className="text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 flex items-center gap-1">
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 flex items-center gap-0.5">
                               <Check className="w-3 h-3" />
-                              통합됨
                             </span>
                           )}
+                          <button
+                            onClick={() => deleteActionItem(item.id)}
+                            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+                            data-testid={`button-delete-action-${item.id}`}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
                         </li>
                       );
                     })}
