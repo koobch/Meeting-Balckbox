@@ -18,8 +18,18 @@ export interface CreateMeetingParams {
 
 export async function createMeeting(params: CreateMeetingParams) {
     try {
-        // Basic extraction of filename from URL if possible, otherwise just use URL
-        // URL format: https://.../storage/v1/object/public/recordings/filename.webm
+        // 1. Get current meeting count for this project to create a unique sequential title
+        const { count, error: countError } = await supabase
+            .from('meetings')
+            .select('*', { count: 'exact', head: true })
+            .eq('project_id', params.projectId);
+
+        if (countError) console.error('Count error:', countError);
+
+        const sequenceNumber = (count || 0) + 1;
+        const finalTitle = `${params.title} #${sequenceNumber}`;
+
+        // 2. Extract storage info
         const urlParts = params.audioUrl.split('/');
         const filename = urlParts[urlParts.length - 1];
         const storagePath = `recordings/${filename}`;
@@ -27,7 +37,7 @@ export async function createMeeting(params: CreateMeetingParams) {
         const { data, error } = await supabase
             .from('meetings')
             .insert({
-                title: params.title,
+                title: finalTitle,
                 project_id: params.projectId, // UUID
                 meeting_date: new Date().toISOString(),
                 audio_duration_seconds: params.durationSeconds,
