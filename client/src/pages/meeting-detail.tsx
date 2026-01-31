@@ -16,7 +16,10 @@ import {
   MoreHorizontal,
   HelpCircle,
   AlertTriangle,
-  Lightbulb
+  Lightbulb,
+  Check,
+  X,
+  UserCog
 } from "lucide-react";
 
 type LogicMarkType = "leap" | "missing" | "ambiguous";
@@ -358,8 +361,20 @@ export default function MeetingDetail() {
   const [activeLine, setActiveLine] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [highlightedFinding, setHighlightedFinding] = useState<string | null>(null);
+  const [role, setRole] = useState<"lead" | "member">("lead");
+  const [pendingMerge, setPendingMerge] = useState({ decisions: 2, evidence: 3, isIntegrated: false });
+  const [showMergeTray, setShowMergeTray] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const logicFindingsRef = useRef<HTMLDivElement>(null);
+
+  const handleIntegrate = () => {
+    setPendingMerge(prev => ({ ...prev, isIntegrated: true }));
+    setShowMergeTray(false);
+  };
+
+  const handleDefer = () => {
+    setShowMergeTray(false);
+  };
 
   useEffect(() => {
     if (isPlaying) {
@@ -429,7 +444,22 @@ export default function MeetingDetail() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-white">
+                <UserCog className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Role:</span>
+                <button
+                  onClick={() => setRole(role === "lead" ? "member" : "lead")}
+                  className={`px-2 py-0.5 text-xs font-medium rounded transition-colors ${
+                    role === "lead" 
+                      ? "bg-primary text-primary-foreground" 
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                  data-testid="toggle-role"
+                >
+                  {role === "lead" ? "Lead" : "Member"}
+                </button>
+              </div>
               <button
                 onClick={() => setIsPlaying(!isPlaying)}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover-elevate"
@@ -603,6 +633,63 @@ export default function MeetingDetail() {
           </aside>
         </div>
       </div>
+
+      {role === "lead" && showMergeTray && !pendingMerge.isIntegrated && (
+        <div 
+          className="fixed bottom-0 left-0 right-0 z-20 animate-in slide-in-from-bottom duration-300"
+          data-testid="merge-tray"
+        >
+          <div className="max-w-3xl mx-auto px-6 pb-6">
+            <div className="bg-white border border-border rounded-lg shadow-lg p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <ListChecks className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      결정 {pendingMerge.decisions}개 + 근거 {pendingMerge.evidence}개를 프로젝트 기억에 통합합니다
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      이 미팅에서 추출된 항목을 프로젝트 Overview에 반영합니다
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleDefer}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
+                    data-testid="button-defer"
+                  >
+                    <X className="w-4 h-4" />
+                    보류
+                  </button>
+                  <button
+                    onClick={handleIntegrate}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover-elevate"
+                    data-testid="button-integrate"
+                  >
+                    <Check className="w-4 h-4" />
+                    통합
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingMerge.isIntegrated && (
+        <div 
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-20 animate-in fade-in slide-in-from-bottom-2 duration-300"
+          data-testid="merge-success"
+        >
+          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500 text-white shadow-lg">
+            <Check className="w-4 h-4" />
+            <span className="text-sm font-medium">프로젝트 기억에 통합되었습니다</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
