@@ -56,6 +56,31 @@ export async function createMeeting(params: CreateMeetingParams) {
             .single();
 
         if (error) throw error;
+
+        // 3. Trigger n8n Webhook
+        try {
+            const webhookUrl = process.env.N8N_WEBHOOK_URL;
+
+            if (webhookUrl) {
+                const payload = [{
+                    project_id: params.projectId,
+                    title: finalTitle
+                }];
+
+                fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }).catch(err => console.error('n8n Webhook background error:', err));
+
+                console.log('n8n Webhook triggered for meeting:', data.id);
+            } else {
+                console.warn('N8N_WEBHOOK_URL is not defined in environment variables.');
+            }
+        } catch (webhookErr) {
+            console.error('Failed to trigger n8n webhook:', webhookErr);
+        }
+
         return { success: true, data };
     } catch (error: any) {
         console.error('Failed to save meeting:', error);
