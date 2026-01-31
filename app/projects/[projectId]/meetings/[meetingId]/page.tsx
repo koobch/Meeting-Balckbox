@@ -73,6 +73,7 @@ interface ActionItem {
   task: string;
   assignee: string;
   completed: boolean;
+  status: string;
   dueDate?: string;
   priority?: string;
 }
@@ -343,7 +344,8 @@ export default function MeetingDetail() {
           id: ai.id,
           task: ai.task,
           assignee: ai.assignee || "미지정",
-          completed: ai.status === "completed",
+          completed: ai.status === "done" || ai.status === "completed",
+          status: ai.status || "pending",
           dueDate: ai.due_date,
           priority: ai.priority
         })));
@@ -562,14 +564,18 @@ export default function MeetingDetail() {
         });
       });
 
-      // Add selected actions
-      selectedActions.forEach(id => {
+      // Add actions based on selection (active/non-completed ones)
+      visibleActions.forEach(item => {
+        // Already "done" items are skipped or can be included if needed, 
+        // but user specifically mentioned true/false for what's shown/selectable.
+        if (item.status === 'done' || item.status === 'completed') return;
+
         payload.push({
           meeting_id: mId,
           decisions_id: null,
           desicion_status: null,
-          actions_id: id,
-          actions_status: "true"
+          actions_id: item.id,
+          actions_status: selectedActions.has(item.id) ? "true" : "false"
         });
       });
 
@@ -626,9 +632,9 @@ export default function MeetingDetail() {
   const toggleActionComplete = async (id: string) => {
     try {
       const action = actionItemsState.find(a => a.id === id);
-      if (!action) return;
+      if (!action || action.status === 'done' || action.status === 'completed') return;
 
-      const newStatus = action.completed ? 'pending' : 'completed';
+      const newStatus = "done"; // Based on user request "done"
 
       // Call API to update status
       console.log('[Action] Toggling status:', id, newStatus);
@@ -659,7 +665,15 @@ export default function MeetingDetail() {
 
   // Computed values
   const visibleDecisions = decisionSummariesState.filter(d => !hiddenDecisions.has(d.id));
-  const visibleActions = actionItemsState.filter(a => !hiddenActions.has(a.id));
+  const visibleActions = useMemo(() =>
+    [...actionItemsState]
+      .filter(a => !hiddenActions.has(a.id))
+      .sort((a, b) => {
+        if (a.completed === b.completed) return 0;
+        return a.completed ? 1 : -1;
+      }),
+    [actionItemsState, hiddenActions]
+  );
   const completedActionsCount = visibleActions.filter(a => a.completed).length;
 
   const currentLogicGap = logicGapsState[currentLogicGapIndex];
@@ -827,10 +841,11 @@ export default function MeetingDetail() {
                           checked={item.completed}
                           onCheckedChange={() => toggleActionComplete(item.id)}
                           className="mt-0.5 rounded-sm"
+                          disabled={item.status === 'done' || item.status === 'completed'}
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-[13.5px] leading-relaxed ${item.completed ? 'line-through text-muted-foreground/60' : 'text-foreground/80'}`}>{item.task}</p>
+                        <p className={`text-[13.5px] leading-relaxed ${(item.status === 'done' || item.status === 'completed') ? 'line-through text-muted-foreground/60' : 'text-foreground/80'}`}>{item.task}</p>
                         <p className="text-[11px] text-muted-foreground/60 mt-0.5">{item.assignee}</p>
                       </div>
 
