@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { FileText, ExternalLink, Calendar, Upload, Download, Trash2, File } from "lucide-react";
+import { FileText, ExternalLink, Calendar, Upload, Download, Trash2, File, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface EvidenceItem {
@@ -111,6 +111,7 @@ export default function EvidencePage() {
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadSummary, setUploadSummary] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<EvidenceItem | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -217,8 +218,25 @@ export default function EvidencePage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6">
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="파일 검색..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+            data-testid="input-search-evidence"
+          />
+        </div>
         <div className="space-y-3">
-          {evidenceData.map(evidence => {
+          {evidenceData
+            .filter(evidence => 
+              searchQuery === "" || 
+              evidence.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              evidence.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              evidence.fileName?.toLowerCase().includes(searchQuery.toLowerCase())
+            )
+            .map(evidence => {
             const typeInfo = typeConfig[evidence.type as keyof typeof typeConfig];
             return (
               <Card key={evidence.id} className="hover-elevate" data-testid={`evidence-card-${evidence.id}`}>
