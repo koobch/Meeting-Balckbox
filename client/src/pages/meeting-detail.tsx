@@ -28,6 +28,7 @@ import {
   AlertTriangle,
   Lightbulb,
   Check,
+  CheckSquare,
   X,
   UserCog,
   Inbox,
@@ -428,7 +429,6 @@ export default function MeetingDetail() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [highlightedFinding, setHighlightedFinding] = useState<string | null>(null);
   const [selectedFindingIndex, setSelectedFindingIndex] = useState(0);
-  const selectedFinding = logicFindings[selectedFindingIndex]?.id || "";
   const [role, setRole] = useState<"lead" | "member">("lead");
   const [meetingTitle, setMeetingTitle] = useState(meetingInfo.title);
   const [projectName, setProjectName] = useProjectName(projectId);
@@ -450,6 +450,19 @@ export default function MeetingDetail() {
   
   const [findingResearchStates, setFindingResearchStates] = useState<Record<string, FindingResearchState>>({});
   const [findingLoadingDots, setFindingLoadingDots] = useState<Record<string, number>>({});
+  const [logicFindingsState, setLogicFindingsState] = useState<LogicFinding[]>(logicFindings);
+
+  const handleCompleteFinding = (findingId: string) => {
+    setLogicFindingsState(prev => {
+      const newFindings = prev.filter(f => f.id !== findingId);
+      if (selectedFindingIndex >= newFindings.length && newFindings.length > 0) {
+        setSelectedFindingIndex(newFindings.length - 1);
+      } else if (newFindings.length === 0) {
+        setSelectedFindingIndex(0);
+      }
+      return newFindings;
+    });
+  };
   
   const speakerMappingsKey = `trace-pm-speaker-mappings-${meetingId}`;
   const [speakerMappings, setSpeakerMappings] = useState<Record<string, string>>(() => {
@@ -557,11 +570,11 @@ export default function MeetingDetail() {
   };
 
   const goToPrevFinding = () => {
-    setSelectedFindingIndex(prev => prev > 0 ? prev - 1 : logicFindings.length - 1);
+    setSelectedFindingIndex(prev => prev > 0 ? prev - 1 : logicFindingsState.length - 1);
   };
 
   const goToNextFinding = () => {
-    setSelectedFindingIndex(prev => prev < logicFindings.length - 1 ? prev + 1 : 0);
+    setSelectedFindingIndex(prev => prev < logicFindingsState.length - 1 ? prev + 1 : 0);
   };
 
   const scrollToTranscriptLine = (lineId: string) => {
@@ -955,15 +968,15 @@ export default function MeetingDetail() {
                   <AlertTriangle className="w-4 h-4 text-orange-500" />
                   보완 필요 항목
                   <Badge variant="secondary" className="ml-auto text-xs bg-orange-100 text-orange-600">
-                    {logicFindings.length}
+                    {logicFindingsState.length}
                   </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3">
-                {logicFindings.length > 0 && (
+                {logicFindingsState.length > 0 && (
                   <div className="relative">
                     <div className="flex items-center gap-2">
-                      {logicFindings.length > 1 && (
+                      {logicFindingsState.length > 1 && (
                         <Button 
                           variant="ghost" 
                           size="icon" 
@@ -976,7 +989,7 @@ export default function MeetingDetail() {
                       )}
                       <div className="flex-1 min-w-0">
                         {(() => {
-                          const finding = logicFindings[selectedFindingIndex];
+                          const finding = logicFindingsState[selectedFindingIndex];
                           if (!finding) return null;
                           const researchState = findingResearchStates[finding.id] || "idle";
                           const loadingDots = findingLoadingDots[finding.id] || 0;
@@ -1072,11 +1085,23 @@ export default function MeetingDetail() {
                                   </div>
                                 )}
                               </div>
+                              
+                              <div className="pt-2 mt-2 border-t border-border/50 flex justify-end">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => handleCompleteFinding(finding.id)}
+                                  data-testid={`button-complete-finding-${finding.id}`}
+                                >
+                                  <CheckSquare className="w-3.5 h-3.5 mr-1" />
+                                  보완 완료
+                                </Button>
+                              </div>
                             </div>
                           );
                         })()}
                       </div>
-                      {logicFindings.length > 1 && (
+                      {logicFindingsState.length > 1 && (
                         <Button 
                           variant="ghost" 
                           size="icon" 
@@ -1088,9 +1113,9 @@ export default function MeetingDetail() {
                         </Button>
                       )}
                     </div>
-                    {logicFindings.length > 1 && (
+                    {logicFindingsState.length > 1 && (
                       <div className="flex justify-center gap-1 mt-2">
-                        {logicFindings.map((_, idx) => (
+                        {logicFindingsState.map((_, idx) => (
                           <button
                             key={idx}
                             onClick={() => setSelectedFindingIndex(idx)}
