@@ -14,6 +14,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Lightbulb,
   Calendar,
   AlertCircle,
@@ -104,16 +109,20 @@ interface EvidenceDrop {
   addedAt: string;
 }
 
+interface CalendarMeeting {
+  id: string;
+  title: string;
+  todoStats: {
+    total: number;
+    completed: number;
+  };
+}
+
 interface CalendarDay {
   date: string;
   day: number;
   hasMeeting: boolean;
-  meetingId: string | null;
-  meetingTitle: string | null;
-  todoStats: {
-    total: number;
-    completed: number;
-  } | null;
+  meetings: CalendarMeeting[];
 }
 
 interface ProjectInfo {
@@ -129,7 +138,7 @@ function generateCalendarData(year: number, month: number, meetingsData: any): C
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfWeek = new Date(year, month, 1).getDay();
 
-  const meetingsMap = meetingsData[`${year}-${month}`] || {};
+  const meetingsMap = (meetingsData && meetingsData[`${year}-${month}`]) || {};
 
   const days: CalendarDay[] = [];
 
@@ -138,21 +147,17 @@ function generateCalendarData(year: number, month: number, meetingsData: any): C
       date: "",
       day: 0,
       hasMeeting: false,
-      meetingId: null,
-      meetingTitle: null,
-      todoStats: null
+      meetings: []
     });
   }
 
   for (let day = 1; day <= daysInMonth; day++) {
-    const meeting = meetingsMap[day];
+    const dayMeetings = meetingsMap[day] || [];
     days.push({
       date: `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
       day,
-      hasMeeting: !!meeting,
-      meetingId: meeting?.meetingId || null,
-      meetingTitle: meeting?.meetingTitle || null,
-      todoStats: meeting?.todoStats || null
+      hasMeeting: dayMeetings.length > 0,
+      meetings: dayMeetings
     });
   }
 
@@ -185,13 +190,27 @@ function MeetingIntegrationCalendar({ projectId, meetingsData }: { projectId: st
     }
   };
 
+  const getDayStats = (day: CalendarDay) => {
+    let total = 0;
+    let completed = 0;
+    day.meetings.forEach(m => {
+      total += m.todoStats.total;
+      completed += m.todoStats.completed;
+    });
+    return { total, completed };
+  };
+
   const getCompletionRate = (day: CalendarDay): number => {
-    if (!day.todoStats || day.todoStats.total === 0) return 0;
-    return (day.todoStats.completed / day.todoStats.total) * 100;
+    const stats = getDayStats(day);
+    if (stats.total === 0) return 100; // No todos means effectively complete
+    return (stats.completed / stats.total) * 100;
   };
 
   const getStatusColor = (day: CalendarDay) => {
-    if (!day.hasMeeting || !day.todoStats) return "bg-muted/50 text-muted-foreground";
+    if (!day.hasMeeting) return "bg-muted/50 text-muted-foreground";
+    const stats = getDayStats(day);
+    if (stats.total === 0) return "bg-emerald-500 text-white"; // Meeting exists but no tasks
+
     const rate = getCompletionRate(day);
     if (rate === 100) return "bg-emerald-500 text-white";
     if (rate > 0) return "bg-amber-400 text-white";
@@ -199,16 +218,19 @@ function MeetingIntegrationCalendar({ projectId, meetingsData }: { projectId: st
   };
 
   const getStatusLabel = (day: CalendarDay) => {
-    if (!day.todoStats) return "";
+    if (!day.hasMeeting) return "";
+    const stats = getDayStats(day);
+    if (stats.total === 0) return "회의 완료 (할 일 없음)";
+
     const rate = getCompletionRate(day);
-    if (rate === 100) return "모든 할일 완료";
+    if (rate === 100) return "모든 할 일 완료";
     if (rate > 0) return `${Math.round(rate)}% 완료`;
     return "미완료";
   };
 
   const handleDayClick = (day: CalendarDay) => {
-    if (day.hasMeeting && day.meetingId) {
-      router.push(`/projects/${projectId}/meetings/${day.meetingId}`);
+    if (day.hasMeeting && day.meetings.length === 1) {
+      router.push(`/projects/${projectId}/meetings/${day.meetings[0].id}`);
     }
   };
 
@@ -250,28 +272,69 @@ function MeetingIntegrationCalendar({ projectId, meetingsData }: { projectId: st
           ))}
         </div>
         <div className="grid grid-cols-7 gap-1">
-          {calendarData.map((day: CalendarDay, index: number) => (
-            day.day === 0 ? (
-              <div key={`empty-${index}`} className="aspect-square" />
-            ) : (
+          {calendarData.map((day: CalendarDay, index: number) => {
+            if (day.day === 0) return <div key={`empty-${index}`} className="aspect-square" />;
+
+            const mainButton = (
+              <button
+                onClick={() => handleDayClick(day)}
+                className={`aspect-square w-full rounded-md flex items-center justify-center text-xs font-medium transition-all ${getStatusColor(day)} ${day.hasMeeting ? 'cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-primary/50' : 'cursor-default'}`}
+                data-testid={`calendar-day-${day.day}`}
+                disabled={!day.hasMeeting}
+              >
+                {day.day}
+              </button>
+            );
+
+            return (
               <Tooltip key={day.date}>
                 <TooltipTrigger asChild>
-                  <button
-                    onClick={() => handleDayClick(day)}
-                    className={`aspect-square rounded-md flex items-center justify-center text-xs font-medium transition-all ${getStatusColor(day)} ${day.hasMeeting ? 'cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-primary/50' : 'cursor-default'}`}
-                    data-testid={`calendar-day-${day.day}`}
-                    disabled={!day.hasMeeting}
-                  >
-                    {day.day}
-                  </button>
+                  {day.hasMeeting && day.meetings.length > 1 ? (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        {mainButton}
+                      </PopoverTrigger>
+                      <PopoverContent className="w-56 p-2">
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold px-2 py-1 mb-1 border-b">회의 선택 ({day.meetings.length}건)</p>
+                          {day.meetings.map(m => (
+                            <button
+                              key={m.id}
+                              onClick={() => router.push(`/projects/${projectId}/meetings/${m.id}`)}
+                              className="w-full text-left text-xs p-2 hover:bg-muted rounded-md transition-colors flex flex-col gap-0.5"
+                            >
+                              <span className="font-medium truncate">{m.title}</span>
+                              <span className="text-[10px] text-muted-foreground">
+                                할 일 {m.todoStats.completed}/{m.todoStats.total} 완료
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  ) : mainButton}
                 </TooltipTrigger>
-                {day.hasMeeting && day.todoStats && (
+                {day.hasMeeting && (
                   <TooltipContent side="top" className="max-w-[200px] p-3">
                     <div className="space-y-1.5">
-                      <p className="font-medium text-xs">{day.meetingTitle}</p>
-                      <div className="text-xs text-muted-foreground space-y-0.5">
-                        <p>할 일 {day.todoStats.completed}/{day.todoStats.total}개 완료</p>
-                      </div>
+                      {day.meetings.length === 1 ? (
+                        <>
+                          <p className="font-medium text-xs">{day.meetings[0].title}</p>
+                          <div className="text-xs text-muted-foreground space-y-0.5">
+                            <p>할 일 {day.meetings[0].todoStats.completed}/{day.meetings[0].todoStats.total}개 완료</p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-medium text-xs">회의 {day.meetings.length}건</p>
+                          <div className="text-xs text-muted-foreground space-y-0.5">
+                            {day.meetings.slice(0, 3).map(m => (
+                              <p key={m.id} className="truncate">• {m.title}</p>
+                            ))}
+                            {day.meetings.length > 3 && <p className="text-[10px]">...외 {day.meetings.length - 3}건</p>}
+                          </div>
+                        </>
+                      )}
                       <p className={`text-xs font-medium ${getCompletionRate(day) === 100 ? 'text-emerald-600' :
                         getCompletionRate(day) > 0 ? 'text-amber-600' : 'text-red-600'
                         }`}>
@@ -281,13 +344,13 @@ function MeetingIntegrationCalendar({ projectId, meetingsData }: { projectId: st
                   </TooltipContent>
                 )}
               </Tooltip>
-            )
-          ))}
+            );
+          })}
         </div>
         <div className="flex items-center justify-center gap-4 mt-4 text-xs">
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded bg-emerald-500" />
-            <span className="text-muted-foreground">100% 완료</span>
+            <span className="text-muted-foreground">완료</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded bg-amber-400" />
@@ -903,7 +966,7 @@ export default function ProjectOverview() {
             id: g.id,
             title: g.claim,
             description: g.gap,
-            status: g.review_status === "completed" ? "integrated" : "draft",
+            status: g.review_status === "done" ? "integrated" : "draft",
             strength: "weak",
             evidenceCount: 1,
             segmentCount: 0,
@@ -916,24 +979,48 @@ export default function ProjectOverview() {
             id: ai.id,
             title: ai.task,
             assignee: ai.assignee || "미지정",
-            completed: ai.status === "completed",
+            completed: ai.status === "done",
             createdAt: ai.created_at
           })));
 
-          // Format meetings for calendar
+          // Format meetings for calendar (Robust string-based parsing)
           const cal: any = {};
-          meetings.forEach((m: any) => {
-            if (m.meeting_date) {
-              const d = new Date(m.meeting_date);
-              const key = `${d.getFullYear()}-${d.getMonth()}`;
-              if (!cal[key]) cal[key] = {};
-              cal[key][d.getDate()] = {
-                meetingId: m.id,
-                meetingTitle: m.title,
-                todoStats: { total: 0, completed: 0 }
-              };
-            }
-          });
+          if (Array.isArray(meetings)) {
+            meetings.forEach((m: any) => {
+              if (m.meeting_date && typeof m.meeting_date === 'string') {
+                try {
+                  const datePart = m.meeting_date.split('T')[0];
+                  const parts = datePart.split('-');
+                  if (parts.length === 3) {
+                    const y = parseInt(parts[0]);
+                    const mm = parseInt(parts[1]);
+                    const dd = parseInt(parts[2]);
+
+                    if (!isNaN(y) && !isNaN(mm) && !isNaN(dd)) {
+                      const key = `${y}-${mm - 1}`; // JS month is 0-indexed
+                      if (!cal[key]) cal[key] = {};
+                      if (!cal[key][dd]) cal[key][dd] = [];
+
+                      const meetingActions = (actionItems || []).filter((ai: any) =>
+                        String(ai.meeting_id) === String(m.id)
+                      );
+
+                      cal[key][dd].push({
+                        id: String(m.id),
+                        title: m.title || "제목 없음",
+                        todoStats: {
+                          total: meetingActions.length,
+                          completed: meetingActions.filter((ai: any) => ai.status === "done").length
+                        }
+                      });
+                    }
+                  }
+                } catch (e) {
+                  console.error("Error processing calendar data:", e);
+                }
+              }
+            });
+          }
           setMeetingsCalendarData(cal);
 
           // 5. Fetch project master data
@@ -963,7 +1050,7 @@ export default function ProjectOverview() {
     ));
 
     try {
-      const result = await updateActionItemStatus(id.toString(), "completed");
+      const result = await updateActionItemStatus(id.toString(), "done");
       if (!result.success) throw new Error(result.error);
 
       toast({
