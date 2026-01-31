@@ -686,7 +686,10 @@ export default function MeetingDetail() {
                     checked={decisionsSelectMode}
                     onCheckedChange={(checked) => {
                       setDecisionsSelectMode(!!checked);
-                      if (!checked) {
+                      if (checked) {
+                        // Select all visible decisions
+                        setSelectedDecisions(new Set(visibleDecisions.map(d => d.id)));
+                      } else {
                         setSelectedDecisions(new Set());
                       }
                     }}
@@ -701,24 +704,27 @@ export default function MeetingDetail() {
                   {visibleDecisions.map((decision, idx) => (
                     <div
                       key={decision.id}
+                      onClick={() => decisionsSelectMode && toggleDecisionSelect(decision.id)}
                       className={`flex items-start gap-3 group transition-colors rounded-md -mx-2 px-2 py-1.5 ${selectedDecisions.has(decision.id) ? 'bg-amber-50/50' : ''
-                        }`}
+                        } ${decisionsSelectMode ? 'cursor-pointer hover:bg-amber-50/30' : ''}`}
                     >
-                      {decisionsSelectMode && (
-                        <Checkbox
-                          checked={selectedDecisions.has(decision.id)}
-                          onCheckedChange={() => toggleDecisionSelect(decision.id)}
-                          className="mt-0.5"
-                        />
-                      )}
                       <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5 shrink-0 group-hover:bg-amber-400 transition-colors" />
                       <p className="text-[13.5px] leading-relaxed text-foreground/80 flex-1">{decision.title}</p>
-                      <button
-                        onClick={() => hideDecision(decision.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 rounded transition-all"
-                      >
-                        <X className="w-3 h-3 text-muted-foreground" />
-                      </button>
+
+                      {/* Show check icon when selected in select mode */}
+                      {decisionsSelectMode && selectedDecisions.has(decision.id) && (
+                        <Check className="w-4 h-4 text-amber-500/60 shrink-0 mt-0.5" />
+                      )}
+
+                      {/* X button - only show when NOT in select mode */}
+                      {!decisionsSelectMode && (
+                        <button
+                          onClick={() => hideDecision(decision.id)}
+                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 rounded transition-all"
+                        >
+                          <X className="w-3 h-3 text-muted-foreground" />
+                        </button>
+                      )}
                     </div>
                   ))}
                   {visibleDecisions.length === 0 && <p className="text-sm text-center py-10 text-muted-foreground italic">기록된 사항이 없습니다.</p>}
@@ -744,7 +750,10 @@ export default function MeetingDetail() {
                     checked={actionsSelectMode}
                     onCheckedChange={(checked) => {
                       setActionsSelectMode(!!checked);
-                      if (!checked) {
+                      if (checked) {
+                        // Select all visible actions
+                        setSelectedActions(new Set(visibleActions.map(a => a.id)));
+                      } else {
                         setSelectedActions(new Set());
                       }
                     }}
@@ -759,31 +768,41 @@ export default function MeetingDetail() {
                   {visibleActions.map((item) => (
                     <div
                       key={item.id}
+                      onClick={(e) => {
+                        // Only toggle selection if in select mode and not clicking on the complete checkbox
+                        if (actionsSelectMode && !(e.target as HTMLElement).closest('[data-checkbox]')) {
+                          toggleActionSelect(item.id);
+                        }
+                      }}
                       className={`flex items-start gap-4 group transition-colors rounded-md -mx-2 px-2 py-1.5 ${selectedActions.has(item.id) ? 'bg-emerald-50/50' : ''
-                        }`}
+                        } ${actionsSelectMode ? 'cursor-pointer hover:bg-emerald-50/30' : ''}`}
                     >
-                      <Checkbox
-                        checked={item.completed}
-                        onCheckedChange={() => toggleActionComplete(item.id)}
-                        className="mt-0.5 rounded-sm"
-                      />
-                      {actionsSelectMode && (
+                      <div data-checkbox onClick={(e) => e.stopPropagation()}>
                         <Checkbox
-                          checked={selectedActions.has(item.id)}
-                          onCheckedChange={() => toggleActionSelect(item.id)}
-                          className="mt-0.5"
+                          checked={item.completed}
+                          onCheckedChange={() => toggleActionComplete(item.id)}
+                          className="mt-0.5 rounded-sm"
                         />
-                      )}
+                      </div>
                       <div className="flex-1 min-w-0">
                         <p className={`text-[13.5px] leading-relaxed ${item.completed ? 'line-through text-muted-foreground/60' : 'text-foreground/80'}`}>{item.task}</p>
                         <p className="text-[11px] text-muted-foreground/60 mt-0.5">{item.assignee}</p>
                       </div>
-                      <button
-                        onClick={() => hideAction(item.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 rounded transition-all"
-                      >
-                        <X className="w-3 h-3 text-muted-foreground" />
-                      </button>
+
+                      {/* Show check icon when selected in select mode */}
+                      {actionsSelectMode && selectedActions.has(item.id) && (
+                        <Check className="w-4 h-4 text-emerald-500/60 shrink-0 mt-0.5" />
+                      )}
+
+                      {/* X button - only show when NOT in select mode */}
+                      {!actionsSelectMode && (
+                        <button
+                          onClick={() => hideAction(item.id)}
+                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 rounded transition-all"
+                        >
+                          <X className="w-3 h-3 text-muted-foreground" />
+                        </button>
+                      )}
                     </div>
                   ))}
                   {visibleActions.length === 0 && <p className="text-sm text-center py-10 text-muted-foreground italic">할 일이 없습니다.</p>}
@@ -1066,81 +1085,87 @@ export default function MeetingDetail() {
         </div>
       </div>
 
-      {/* Bottom Popup for Decisions */}
-      {decisionsSelectMode && selectedDecisions.size > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border shadow-lg z-50 animate-in slide-in-from-bottom duration-200">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 bg-amber-50 px-3 py-1.5 rounded-md">
-                <Lightbulb className="w-4 h-4 text-amber-600" />
-                <span className="text-sm font-medium text-amber-900">
-                  선택됨 {selectedDecisions.size}개
-                </span>
+      {/* Unified Bottom Popup for Integration - Non-modal */}
+      {((decisionsSelectMode && selectedDecisions.size > 0) || (actionsSelectMode && selectedActions.size > 0)) && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom duration-200">
+          <div className="bg-white border border-border rounded-lg shadow-2xl px-6 py-4 min-w-[800px] max-w-5xl">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-md">
+                  <span className="text-sm font-medium text-slate-700">
+                    선택된 항목
+                  </span>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground">
-                선택한 항목을 프로젝트 기억에 통합합니다
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
+              <button
                 onClick={() => {
                   setSelectedDecisions(new Set());
-                  setDecisionsSelectMode(false);
-                }}
-                className="h-9"
-              >
-                선택 해제
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleIntegrateDecisions}
-                className="h-9 bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Check className="w-4 h-4 mr-1.5" />
-                프로젝트 기억에 통합
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bottom Popup for Actions */}
-      {actionsSelectMode && selectedActions.size > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border shadow-lg z-50 animate-in slide-in-from-bottom duration-200">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-md">
-                <CheckSquare className="w-4 h-4 text-emerald-600" />
-                <span className="text-sm font-medium text-emerald-900">
-                  선택됨 {selectedActions.size}개
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                선택한 항목을 프로젝트 기억에 통합합니다
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
                   setSelectedActions(new Set());
+                  setDecisionsSelectMode(false);
                   setActionsSelectMode(false);
                 }}
-                className="h-9"
+                className="text-muted-foreground hover:text-foreground transition-colors"
               >
-                선택 해제
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleIntegrateActions}
-                className="h-9 bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Check className="w-4 h-4 mr-1.5" />
-                프로젝트 기억에 통합
-              </Button>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex items-start gap-6">
+              {/* Decisions Section */}
+              {decisionsSelectMode && selectedDecisions.size > 0 && (
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Lightbulb className="w-4 h-4 text-amber-500" />
+                    <span className="text-sm font-semibold text-foreground">의사 결정</span>
+                    <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200">
+                      {selectedDecisions.size}개
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    선택한 의사 결정 사항을 프로젝트 기억에 통합합니다
+                  </p>
+                </div>
+              )}
+
+              {/* Actions Section */}
+              {actionsSelectMode && selectedActions.size > 0 && (
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckSquare className="w-4 h-4 text-emerald-500" />
+                    <span className="text-sm font-semibold text-foreground">다음 할 일</span>
+                    <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                      {selectedActions.size}개
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    선택한 액션 아이템을 프로젝트 기억에 통합합니다
+                  </p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3 shrink-0">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedDecisions(new Set());
+                    setSelectedActions(new Set());
+                  }}
+                  className="h-9"
+                >
+                  선택 해제
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (selectedDecisions.size > 0) handleIntegrateDecisions();
+                    if (selectedActions.size > 0) handleIntegrateActions();
+                  }}
+                  className="h-9 bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Check className="w-4 h-4 mr-1.5" />
+                  프로젝트 기억에 통합
+                </Button>
+              </div>
             </div>
           </div>
         </div>
