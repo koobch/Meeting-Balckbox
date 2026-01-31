@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useParams } from "wouter";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Lightbulb, 
   Calendar, 
@@ -8,11 +10,20 @@ import {
   FileText, 
   Link2, 
   ChevronRight,
-  Zap
+  Zap,
+  Target,
+  CheckSquare,
+  Shield,
+  Inbox,
+  X,
+  TriangleAlert,
+  CircleSlash,
+  ExternalLink
 } from "lucide-react";
 
 type Status = "draft" | "integrated";
 type EvidenceStrength = "strong" | "medium" | "weak";
+type FilterType = "weak" | "logic-flags" | "missing-evidence" | null;
 
 interface DecisionData {
   id: string;
@@ -24,6 +35,7 @@ interface DecisionData {
   segmentCount: number;
   createdAt: string;
   tags: string[];
+  hasLogicFlag?: boolean;
 }
 
 interface MeetingData {
@@ -36,6 +48,7 @@ interface MeetingData {
   evidenceCount: number;
   segmentCount: number;
   keyPoints: string[];
+  hasLogicFlag?: boolean;
 }
 
 interface GapData {
@@ -48,6 +61,22 @@ interface GapData {
   segmentCount: number;
   priority: "high" | "medium" | "low";
   relatedDecisions: string[];
+  hasLogicFlag?: boolean;
+}
+
+interface ActionItem {
+  id: string;
+  title: string;
+  assignee: string;
+  completed: boolean;
+}
+
+interface EvidenceDrop {
+  id: string;
+  title: string;
+  summary: string;
+  source: string;
+  addedAt: string;
 }
 
 const keywords = [
@@ -71,7 +100,8 @@ const decisions: DecisionData[] = [
     evidenceCount: 12,
     segmentCount: 8,
     createdAt: "2025-01-28",
-    tags: ["MVP 정의", "로드맵"]
+    tags: ["MVP 정의", "로드맵"],
+    hasLogicFlag: false
   },
   {
     id: "dec-2",
@@ -82,7 +112,8 @@ const decisions: DecisionData[] = [
     evidenceCount: 8,
     segmentCount: 5,
     createdAt: "2025-01-25",
-    tags: ["기술 검토"]
+    tags: ["기술 검토"],
+    hasLogicFlag: false
   },
   {
     id: "dec-3",
@@ -93,7 +124,8 @@ const decisions: DecisionData[] = [
     evidenceCount: 6,
     segmentCount: 4,
     createdAt: "2025-01-30",
-    tags: ["시장 분석", "경쟁사 분석"]
+    tags: ["시장 분석", "경쟁사 분석"],
+    hasLogicFlag: true
   }
 ];
 
@@ -107,7 +139,8 @@ const meetings: MeetingData[] = [
     strength: "strong",
     evidenceCount: 15,
     segmentCount: 22,
-    keyPoints: ["핵심 페인포인트 3가지 도출", "우선순위 재정의 필요"]
+    keyPoints: ["핵심 페인포인트 3가지 도출", "우선순위 재정의 필요"],
+    hasLogicFlag: false
   },
   {
     id: "meet-2",
@@ -118,7 +151,8 @@ const meetings: MeetingData[] = [
     strength: "medium",
     evidenceCount: 4,
     segmentCount: 7,
-    keyPoints: ["2주 스프린트 사이클 확정", "일일 스탠드업 10AM"]
+    keyPoints: ["2주 스프린트 사이클 확정", "일일 스탠드업 10AM"],
+    hasLogicFlag: true
   }
 ];
 
@@ -132,7 +166,8 @@ const gaps: GapData[] = [
     evidenceCount: 2,
     segmentCount: 1,
     priority: "high",
-    relatedDecisions: ["B2B SaaS 비즈니스 모델 채택"]
+    relatedDecisions: ["B2B SaaS 비즈니스 모델 채택"],
+    hasLogicFlag: true
   },
   {
     id: "gap-2",
@@ -143,7 +178,46 @@ const gaps: GapData[] = [
     evidenceCount: 1,
     segmentCount: 0,
     priority: "medium",
-    relatedDecisions: ["React + TypeScript 기술 스택 선정"]
+    relatedDecisions: ["React + TypeScript 기술 스택 선정"],
+    hasLogicFlag: false
+  }
+];
+
+const liveBrief = {
+  currentGoal: "MVP 1차 버전 2월 15일까지 출시",
+  latestDecision: "B2B SaaS 구독 모델 채택 검토 중",
+  weeklyRisk: "가격 정책 근거 부족으로 출시 지연 가능성"
+};
+
+const actionItems: ActionItem[] = [
+  { id: "act-1", title: "경쟁사 가격 조사 완료", assignee: "김연구", completed: true },
+  { id: "act-2", title: "사용자 페르소나 문서 업데이트", assignee: "이디자인", completed: false },
+  { id: "act-3", title: "API 스펙 문서 작성", assignee: "박개발", completed: false },
+  { id: "act-4", title: "QA 테스트 계획 수립", assignee: "정QA", completed: false },
+  { id: "act-5", title: "스프린트 회고 준비", assignee: "최PM", completed: true }
+];
+
+const evidenceDrops: EvidenceDrop[] = [
+  {
+    id: "ev-1",
+    title: "2025 SaaS 시장 트렌드 리포트",
+    summary: "B2B SaaS 시장 연 23% 성장 전망, AI 통합이 핵심 차별화 요소로 부상",
+    source: "Gartner",
+    addedAt: "2시간 전"
+  },
+  {
+    id: "ev-2",
+    title: "경쟁사 A사 신규 기능 출시",
+    summary: "실시간 협업 기능 추가, 기존 대비 30% 가격 인상 없이 제공",
+    source: "TechCrunch",
+    addedAt: "5시간 전"
+  },
+  {
+    id: "ev-3",
+    title: "사용자 인터뷰 녹취록 #12",
+    summary: "중소기업 PM 대상, 기존 도구의 복잡성이 가장 큰 불만 사항",
+    source: "Internal",
+    addedAt: "1일 전"
   }
 ];
 
@@ -218,6 +292,12 @@ function DecisionCard({ decision }: { decision: DecisionData }) {
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <StatusBadge status={decision.status} />
           <StrengthBadge strength={decision.strength} />
+          {decision.hasLogicFlag && (
+            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+              <TriangleAlert className="w-3 h-3 mr-1" />
+              논리 검토
+            </Badge>
+          )}
         </div>
         <div className="flex items-center justify-between">
           <MetaInfo evidenceCount={decision.evidenceCount} segmentCount={decision.segmentCount} />
@@ -271,6 +351,12 @@ function MeetingCard({ meeting }: { meeting: MeetingData }) {
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <StatusBadge status={meeting.status} />
           <StrengthBadge strength={meeting.strength} />
+          {meeting.hasLogicFlag && (
+            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+              <TriangleAlert className="w-3 h-3 mr-1" />
+              논리 검토
+            </Badge>
+          )}
         </div>
         <MetaInfo evidenceCount={meeting.evidenceCount} segmentCount={meeting.segmentCount} />
       </CardContent>
@@ -309,6 +395,12 @@ function GapCard({ gap }: { gap: GapData }) {
           <Badge variant="outline" className={priorityConfig[gap.priority].className}>
             우선순위: {priorityConfig[gap.priority].label}
           </Badge>
+          {gap.hasLogicFlag && (
+            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+              <TriangleAlert className="w-3 h-3 mr-1" />
+              논리 검토
+            </Badge>
+          )}
         </div>
         <MetaInfo evidenceCount={gap.evidenceCount} segmentCount={gap.segmentCount} />
         {gap.relatedDecisions.length > 0 && (
@@ -328,13 +420,226 @@ function GapCard({ gap }: { gap: GapData }) {
   );
 }
 
+function LiveBriefCard() {
+  return (
+    <Card data-testid="card-live-brief">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <Target className="w-4 h-4 text-primary" />
+          Live Brief
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div>
+          <p className="text-xs text-muted-foreground mb-0.5">현재 목표</p>
+          <p className="text-sm text-foreground">{liveBrief.currentGoal}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground mb-0.5">최신 결정</p>
+          <p className="text-sm text-foreground">{liveBrief.latestDecision}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground mb-0.5">이번 주 리스크</p>
+          <p className="text-sm text-orange-600">{liveBrief.weeklyRisk}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ActionItemsCard() {
+  const [items, setItems] = useState(actionItems);
+  
+  const toggleItem = (id: string) => {
+    setItems(prev => prev.map(item => 
+      item.id === id ? { ...item, completed: !item.completed } : item
+    ));
+  };
+
+  return (
+    <Card data-testid="card-action-items">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <CheckSquare className="w-4 h-4 text-emerald-600" />
+          Action Items
+          <Badge variant="secondary" className="ml-auto text-xs">
+            {items.filter(i => i.completed).length}/{items.length}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-2">
+          {items.map(item => (
+            <li key={item.id} className="flex items-start gap-2">
+              <Checkbox 
+                id={item.id}
+                checked={item.completed}
+                onCheckedChange={() => toggleItem(item.id)}
+                className="mt-0.5"
+                data-testid={`checkbox-action-${item.id}`}
+              />
+              <label 
+                htmlFor={item.id}
+                className={`text-sm flex-1 cursor-pointer ${item.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}
+              >
+                {item.title}
+                <span className="block text-xs text-muted-foreground">{item.assignee}</span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DecisionIntegrityCard({ 
+  activeFilter, 
+  onFilterChange 
+}: { 
+  activeFilter: FilterType; 
+  onFilterChange: (filter: FilterType) => void;
+}) {
+  const allItems = [...decisions, ...meetings, ...gaps];
+  const weakCount = allItems.filter(item => item.strength === "weak").length;
+  const logicFlagCount = allItems.filter(item => item.hasLogicFlag).length;
+  const missingEvidenceCount = allItems.filter(item => item.evidenceCount < 3).length;
+
+  const handleClick = (filter: FilterType) => {
+    onFilterChange(activeFilter === filter ? null : filter);
+  };
+
+  return (
+    <Card data-testid="card-decision-integrity">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <Shield className="w-4 h-4 text-blue-600" />
+          Decision Integrity
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          <button
+            onClick={() => handleClick("weak")}
+            className={`w-full flex items-center justify-between p-2 rounded-md text-sm transition-all hover-elevate ${
+              activeFilter === "weak" ? "bg-red-50 border border-red-200" : "hover:bg-muted"
+            }`}
+            data-testid="filter-weak"
+          >
+            <span className="flex items-center gap-2">
+              <Zap className="w-3.5 h-3.5 text-red-500" />
+              <span className={activeFilter === "weak" ? "text-red-700 font-medium" : "text-foreground"}>
+                Weak Evidence
+              </span>
+            </span>
+            <Badge variant="secondary" className={activeFilter === "weak" ? "bg-red-100 text-red-700" : ""}>
+              {weakCount}
+            </Badge>
+          </button>
+          
+          <button
+            onClick={() => handleClick("logic-flags")}
+            className={`w-full flex items-center justify-between p-2 rounded-md text-sm transition-all hover-elevate ${
+              activeFilter === "logic-flags" ? "bg-yellow-50 border border-yellow-200" : "hover:bg-muted"
+            }`}
+            data-testid="filter-logic-flags"
+          >
+            <span className="flex items-center gap-2">
+              <TriangleAlert className="w-3.5 h-3.5 text-yellow-600" />
+              <span className={activeFilter === "logic-flags" ? "text-yellow-700 font-medium" : "text-foreground"}>
+                Logic Flags
+              </span>
+            </span>
+            <Badge variant="secondary" className={activeFilter === "logic-flags" ? "bg-yellow-100 text-yellow-700" : ""}>
+              {logicFlagCount}
+            </Badge>
+          </button>
+          
+          <button
+            onClick={() => handleClick("missing-evidence")}
+            className={`w-full flex items-center justify-between p-2 rounded-md text-sm transition-all hover-elevate ${
+              activeFilter === "missing-evidence" ? "bg-orange-50 border border-orange-200" : "hover:bg-muted"
+            }`}
+            data-testid="filter-missing-evidence"
+          >
+            <span className="flex items-center gap-2">
+              <CircleSlash className="w-3.5 h-3.5 text-orange-500" />
+              <span className={activeFilter === "missing-evidence" ? "text-orange-700 font-medium" : "text-foreground"}>
+                Missing Evidence
+              </span>
+            </span>
+            <Badge variant="secondary" className={activeFilter === "missing-evidence" ? "bg-orange-100 text-orange-700" : ""}>
+              {missingEvidenceCount}
+            </Badge>
+          </button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function EvidenceDropsCard() {
+  return (
+    <Card data-testid="card-evidence-drops">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <Inbox className="w-4 h-4 text-violet-600" />
+          Evidence Drops
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-3">
+          {evidenceDrops.map(evidence => (
+            <li key={evidence.id} className="group" data-testid={`evidence-drop-${evidence.id}`}>
+              <div className="flex items-start justify-between gap-2">
+                <h4 className="text-sm font-medium text-foreground group-hover:text-primary transition-colors cursor-pointer">
+                  {evidence.title}
+                </h4>
+                <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{evidence.summary}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs text-primary">{evidence.source}</span>
+                <span className="text-xs text-muted-foreground">•</span>
+                <span className="text-xs text-muted-foreground">{evidence.addedAt}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ProjectOverview() {
   const params = useParams<{ id: string }>();
+  const [activeFilter, setActiveFilter] = useState<FilterType>(null);
+
+  const filterItems = <T extends { strength: EvidenceStrength; evidenceCount: number; hasLogicFlag?: boolean }>(items: T[]): T[] => {
+    if (!activeFilter) return items;
+    
+    switch (activeFilter) {
+      case "weak":
+        return items.filter(item => item.strength === "weak");
+      case "logic-flags":
+        return items.filter(item => item.hasLogicFlag);
+      case "missing-evidence":
+        return items.filter(item => item.evidenceCount < 3);
+      default:
+        return items;
+    }
+  };
+
+  const filteredDecisions = filterItems(decisions);
+  const filteredMeetings = filterItems(meetings);
+  const filteredGaps = filterItems(gaps);
+
+  const hasResults = filteredDecisions.length > 0 || filteredMeetings.length > 0 || filteredGaps.length > 0;
   
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-white sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center">
               <span className="text-primary-foreground text-lg font-semibold">P</span>
@@ -349,73 +654,122 @@ export default function ProjectOverview() {
         </div>
       </header>
       
-      <main className="max-w-4xl mx-auto px-6 py-6">
-        <section className="mb-6" data-testid="section-keywords">
-          <h2 className="text-sm font-medium text-muted-foreground mb-3">키워드</h2>
-          <div className="flex flex-wrap gap-2">
-            {keywords.map(keyword => (
-              <button
-                key={keyword}
-                className="px-3 py-1.5 text-sm rounded-full border border-border bg-white text-foreground hover-elevate transition-all"
-                data-testid={`chip-keyword-${keyword}`}
-              >
-                {keyword}
-              </button>
-            ))}
-          </div>
-        </section>
+      <div className="max-w-7xl mx-auto px-6 py-6">
+        <div className="flex gap-6">
+          <main className="flex-1 min-w-0">
+            <section className="mb-6" data-testid="section-keywords">
+              <h2 className="text-sm font-medium text-muted-foreground mb-3">키워드</h2>
+              <div className="flex flex-wrap gap-2">
+                {keywords.map(keyword => (
+                  <button
+                    key={keyword}
+                    className="px-3 py-1.5 text-sm rounded-full border border-border bg-white text-foreground hover-elevate transition-all"
+                    data-testid={`chip-keyword-${keyword}`}
+                  >
+                    {keyword}
+                  </button>
+                ))}
+              </div>
+            </section>
 
-        <section className="mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center">
-              <Lightbulb className="w-3.5 h-3.5 text-primary" />
-            </div>
-            <h2 className="text-lg font-semibold text-foreground" data-testid="section-decisions-title">
-              주요 결정사항
-            </h2>
-            <Badge variant="secondary" className="ml-auto">{decisions.length}</Badge>
-          </div>
-          <div className="space-y-4" data-testid="list-decisions">
-            {decisions.map(decision => (
-              <DecisionCard key={decision.id} decision={decision} />
-            ))}
-          </div>
-        </section>
+            {activeFilter && (
+              <div className="mb-4 flex items-center gap-2" data-testid="filter-indicator">
+                <Badge variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-1">
+                  <span className="text-xs">
+                    필터: {activeFilter === "weak" ? "Weak Evidence" : activeFilter === "logic-flags" ? "Logic Flags" : "Missing Evidence"}
+                  </span>
+                  <button 
+                    onClick={() => setActiveFilter(null)}
+                    className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20"
+                    data-testid="button-clear-filter"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </Badge>
+              </div>
+            )}
 
-        <section className="mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded bg-violet-100 flex items-center justify-center">
-              <Calendar className="w-3.5 h-3.5 text-violet-600" />
-            </div>
-            <h2 className="text-lg font-semibold text-foreground" data-testid="section-meetings-title">
-              미팅 기록
-            </h2>
-            <Badge variant="secondary" className="ml-auto">{meetings.length}</Badge>
-          </div>
-          <div className="space-y-4" data-testid="list-meetings">
-            {meetings.map(meeting => (
-              <MeetingCard key={meeting.id} meeting={meeting} />
-            ))}
-          </div>
-        </section>
+            {!hasResults && activeFilter && (
+              <div className="py-12 text-center" data-testid="empty-filter-result">
+                <p className="text-muted-foreground">해당 필터에 맞는 항목이 없습니다.</p>
+                <button 
+                  onClick={() => setActiveFilter(null)}
+                  className="mt-2 text-sm text-primary hover:underline"
+                >
+                  필터 해제
+                </button>
+              </div>
+            )}
 
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded bg-orange-100 flex items-center justify-center">
-              <AlertCircle className="w-3.5 h-3.5 text-orange-600" />
-            </div>
-            <h2 className="text-lg font-semibold text-foreground" data-testid="section-gaps-title">
-              보완 필요 항목
-            </h2>
-            <Badge variant="secondary" className="ml-auto">{gaps.length}</Badge>
-          </div>
-          <div className="space-y-4" data-testid="list-gaps">
-            {gaps.map(gap => (
-              <GapCard key={gap.id} gap={gap} />
-            ))}
-          </div>
-        </section>
-      </main>
+            {filteredDecisions.length > 0 && (
+              <section className="mb-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center">
+                    <Lightbulb className="w-3.5 h-3.5 text-primary" />
+                  </div>
+                  <h2 className="text-lg font-semibold text-foreground" data-testid="section-decisions-title">
+                    주요 결정사항
+                  </h2>
+                  <Badge variant="secondary" className="ml-auto">{filteredDecisions.length}</Badge>
+                </div>
+                <div className="space-y-4" data-testid="list-decisions">
+                  {filteredDecisions.map(decision => (
+                    <DecisionCard key={decision.id} decision={decision} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {filteredMeetings.length > 0 && (
+              <section className="mb-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-6 h-6 rounded bg-violet-100 flex items-center justify-center">
+                    <Calendar className="w-3.5 h-3.5 text-violet-600" />
+                  </div>
+                  <h2 className="text-lg font-semibold text-foreground" data-testid="section-meetings-title">
+                    미팅 기록
+                  </h2>
+                  <Badge variant="secondary" className="ml-auto">{filteredMeetings.length}</Badge>
+                </div>
+                <div className="space-y-4" data-testid="list-meetings">
+                  {filteredMeetings.map(meeting => (
+                    <MeetingCard key={meeting.id} meeting={meeting} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {filteredGaps.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-6 h-6 rounded bg-orange-100 flex items-center justify-center">
+                    <AlertCircle className="w-3.5 h-3.5 text-orange-600" />
+                  </div>
+                  <h2 className="text-lg font-semibold text-foreground" data-testid="section-gaps-title">
+                    보완 필요 항목
+                  </h2>
+                  <Badge variant="secondary" className="ml-auto">{filteredGaps.length}</Badge>
+                </div>
+                <div className="space-y-4" data-testid="list-gaps">
+                  {filteredGaps.map(gap => (
+                    <GapCard key={gap.id} gap={gap} />
+                  ))}
+                </div>
+              </section>
+            )}
+          </main>
+
+          <aside className="w-80 flex-shrink-0 space-y-4" data-testid="sidebar-right">
+            <LiveBriefCard />
+            <ActionItemsCard />
+            <DecisionIntegrityCard 
+              activeFilter={activeFilter} 
+              onFilterChange={setActiveFilter} 
+            />
+            <EvidenceDropsCard />
+          </aside>
+        </div>
+      </div>
     </div>
   );
 }
