@@ -634,21 +634,23 @@ function ActionItemsCard({
   }, [actionItems]);
 
   return (
-    <Card data-testid="card-action-items" className="flex flex-col h-full">
+    <Card data-testid="card-action-items" className="flex flex-col h-full border-none shadow-sm bg-card/50 backdrop-blur-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
-          <CheckSquare className="w-4 h-4 text-emerald-600" />
+          <div className="p-1 rounded-md bg-emerald-100 dark:bg-emerald-900/30">
+            <CheckSquare className="w-4 h-4 text-emerald-600" />
+          </div>
           다음 할 일
-          <Badge variant="secondary" className="ml-auto text-xs">
+          <Badge variant="secondary" className="ml-auto text-[10px] px-1.5 h-5">
             {actionItems.filter(i => i.completed).length}/{actionItems.length}
           </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 overflow-hidden">
-        <ul className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+        <ul className="space-y-2 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin">
           {sortedItems.length > 0 ? (
             sortedItems.map(item => (
-              <li key={item.id} className="flex items-start gap-2">
+              <li key={item.id} className="flex items-start gap-2 group">
                 <Checkbox
                   id={item.id}
                   checked={item.completed}
@@ -659,7 +661,7 @@ function ActionItemsCard({
                 />
                 <label
                   htmlFor={item.id}
-                  className={`text-sm flex-1 cursor-pointer ${item.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}
+                  className={`text-sm flex-1 cursor-pointer transition-colors ${item.completed ? 'line-through text-muted-foreground' : 'text-foreground hover:text-primary'}`}
                 >
                   {item.title}
                 </label>
@@ -667,10 +669,67 @@ function ActionItemsCard({
             ))
           ) : (
             <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+              <Inbox className="w-8 h-8 opacity-20 mb-2" />
               <p className="text-xs">할 일이 없습니다.</p>
             </div>
           )}
         </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DecisionIntegrationCard({ decisions }: { decisions: DecisionData[] }) {
+  const pendingDecisions = useMemo(() =>
+    decisions.filter(d => d.status === "draft"),
+    [decisions]
+  );
+
+  return (
+    <Card className="flex flex-col h-full border-none shadow-sm bg-card/50 backdrop-blur-sm overflow-hidden">
+      <CardHeader className="py-3 px-4 border-b border-border/50 bg-muted/20">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <div className="p-1 rounded-md bg-blue-100 dark:bg-blue-900/30">
+            <Lightbulb className="w-4 h-4 text-blue-600" />
+          </div>
+          통합 완료 항목
+          <Badge variant="secondary" className="ml-auto text-[10px] px-1.5 h-5 bg-blue-50 text-blue-700 border-blue-100">
+            {pendingDecisions.length}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0 flex-1 overflow-hidden">
+        {pendingDecisions.length > 0 ? (
+          <div className="divide-y divide-border/40 max-h-[400px] overflow-y-auto scrollbar-thin">
+            {pendingDecisions.map((decision) => (
+              <div key={decision.id} className="group p-4 hover:bg-muted/30 transition-all relative overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="space-y-1.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-medium text-foreground leading-snug">
+                      {decision.title}
+                    </p>
+                    <Badge variant="outline" className="text-[9px] font-normal py-0 px-1 whitespace-nowrap opacity-60">
+                      {decision.createdAt}
+                    </Badge>
+                  </div>
+                  {decision.description && (
+                    <div className="relative">
+                      <p className="text-xs text-muted-foreground leading-relaxed pl-3 border-l-2 border-muted">
+                        {decision.description}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+            <Zap className="w-10 h-10 text-blue-400 mb-2 opacity-20" />
+            <p className="text-sm">통합 대기 중인 항목이 없습니다.</p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -1111,31 +1170,9 @@ export default function ProjectOverview() {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6" data-testid="section-bottom-row">
               <MeetingIntegrationCalendar projectId={projectId || "1"} meetingsData={meetingsCalendarData} />
-              <Card data-testid="card-gaps" className="flex flex-col h-full">
-                <CardHeader className="py-3 px-4 border-b border-border">
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-orange-600" />
-                    보완 필요 항목
-                    <Badge variant="secondary" className="ml-2">{gapsData.length}</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 flex-1">
-                  {gapsData.length > 0 ? (
-                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1" data-testid="list-gaps">
-                      {gapsData.map(gap => (
-                        <GapItem key={gap.id} gap={gap} onComplete={handleCompleteGap} />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-                      <Check className="w-10 h-10 text-emerald-500 mb-2 opacity-50" />
-                      <p className="text-sm">현재 보완할 항목이 없습니다.</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <DecisionIntegrationCard decisions={decisionsState} />
             </div>
           </div>
         )}
