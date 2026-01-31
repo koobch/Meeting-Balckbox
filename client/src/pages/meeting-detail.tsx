@@ -527,7 +527,7 @@ export default function MeetingDetail() {
                 </Badge>
               </CardTitle>
             </CardHeader>
-            <ScrollArea className="h-40">
+            <ScrollArea className="h-56">
               <CardContent className="p-3">
                 <ul className="space-y-2">
                   {decisionSummaries.map(decision => (
@@ -554,7 +554,7 @@ export default function MeetingDetail() {
                 </Badge>
               </CardTitle>
             </CardHeader>
-            <ScrollArea className="h-40">
+            <ScrollArea className="h-56">
               <CardContent className="p-3">
                 <ul className="space-y-2">
                   {actionItemsData.map(item => (
@@ -581,36 +581,68 @@ export default function MeetingDetail() {
             </ScrollArea>
           </Card>
 
-          <Card data-testid="summary-logic-findings">
-            <CardHeader className="py-3 px-4 border-b border-border">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <HelpCircle className="w-4 h-4 text-slate-500" />
-                Logic Findings
-                <Badge variant="secondary" className="ml-auto text-xs bg-slate-100 text-slate-600">
-                  {logicFindings.length}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <ScrollArea className="h-40">
-              <CardContent className="p-3">
-                <ul className="space-y-2">
-                  {logicFindings.map(finding => (
-                    <li 
-                      key={finding.id} 
-                      className="flex items-start gap-2 cursor-pointer hover:bg-muted/50 rounded p-1.5 -mx-1.5 transition-colors"
-                      onClick={() => scrollToLogicFinding(finding.id)}
-                      data-testid={`logic-summary-${finding.id}`}
-                    >
-                      <div className={`px-1.5 py-0.5 text-xs rounded border flex-shrink-0 ${logicMarkConfig[finding.type].className}`}>
-                        {finding.type}
-                      </div>
-                      <span className="text-sm text-foreground line-clamp-2">{finding.claim}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </ScrollArea>
-          </Card>
+          <div className="space-y-4">
+            <Card ref={logicFindingsRef} data-testid="summary-logic-findings">
+              <CardHeader className="py-2 px-4 border-b border-border">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <HelpCircle className="w-4 h-4 text-slate-500" />
+                  Logic Findings
+                  <Badge variant="secondary" className="ml-auto text-xs bg-slate-100 text-slate-600">
+                    {logicFindings.length}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <ScrollArea className="h-20">
+                <CardContent className="p-2">
+                  <ul className="space-y-1">
+                    {logicFindings.map(finding => (
+                      <li 
+                        key={finding.id} 
+                        className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 rounded px-1.5 py-1 transition-colors"
+                        onClick={() => scrollToLogicFinding(finding.id)}
+                        data-testid={`logic-summary-${finding.id}`}
+                      >
+                        <div className={`px-1 py-0.5 text-xs rounded border flex-shrink-0 ${logicMarkConfig[finding.type].className}`}>
+                          {finding.type}
+                        </div>
+                        <span className="text-xs text-foreground truncate">{finding.claim}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </ScrollArea>
+            </Card>
+
+            <Card data-testid="section-evidence-drops">
+              <CardHeader className="py-2 px-4 border-b border-border">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Inbox className="w-4 h-4 text-violet-600" />
+                  Evidence Drops
+                  <Badge variant="secondary" className="ml-auto text-xs bg-violet-100 text-violet-600">
+                    {evidenceDrops.length}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <ScrollArea className="h-20">
+                <CardContent className="p-2">
+                  <ul className="space-y-1">
+                    {evidenceDrops.map(drop => (
+                      <li 
+                        key={drop.id} 
+                        className="group flex items-center gap-2 cursor-pointer hover:bg-muted/50 rounded px-1.5 py-1 transition-colors"
+                        data-testid={`evidence-drop-${drop.id}`}
+                      >
+                        <span className="text-xs font-medium text-foreground group-hover:text-primary truncate flex-1">
+                          {drop.title}
+                        </span>
+                        <ExternalLink className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </ScrollArea>
+            </Card>
+          </div>
         </section>
 
         <div className="flex gap-6 flex-1 min-h-0">
@@ -640,7 +672,7 @@ export default function MeetingDetail() {
             </Card>
           </main>
 
-          <aside className="w-80 flex-shrink-0 space-y-4" data-testid="sidebar-summary">
+          <aside className="w-80 flex-shrink-0 flex flex-col gap-4" data-testid="sidebar-summary">
             <Card>
               <CardHeader className="py-3 px-4 border-b border-border">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -666,132 +698,25 @@ export default function MeetingDetail() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="py-3 px-4 border-b border-border">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <ListChecks className="w-4 h-4 text-emerald-600" />
-                  다음 할 일
-                  <Badge variant="secondary" className="ml-auto text-xs">
-                    {actionItemsData.filter(a => a.completed).length}/{actionItemsData.length}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3">
-                <ul className="space-y-2">
-                  {actionItemsData.map(item => (
-                    <li key={item.id} className="flex items-start gap-2" data-testid={`action-${item.id}`}>
-                      <div className={`w-4 h-4 mt-0.5 rounded border flex-shrink-0 flex items-center justify-center ${
-                        item.completed ? "bg-emerald-500 border-emerald-500" : "border-border"
-                      }`}>
-                        {item.completed && (
-                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm ${item.completed ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                          {item.task}
-                        </p>
-                        <span className="text-xs text-muted-foreground">{item.assignee}</span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="py-3 px-4 border-b border-border">
+            <Card className="flex-1 flex flex-col min-h-0">
+              <CardHeader className="py-3 px-4 border-b border-border flex-shrink-0">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <FileText className="w-4 h-4 text-amber-600" />
                   단락별 요약
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-0">
-                <ScrollArea className="h-48">
-                  <ul className="divide-y divide-border/50">
-                    {paragraphSummaries.map(summary => (
-                      <li key={summary.id} className="p-3" data-testid={`summary-${summary.id}`}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-medium text-primary">{summary.timeRange}</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed">{summary.summary}</p>
-                      </li>
-                    ))}
-                  </ul>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-
-            <Card ref={logicFindingsRef} data-testid="section-logic-findings">
-              <CardHeader className="py-3 px-4 border-b border-border">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <HelpCircle className="w-4 h-4 text-slate-500" />
-                  Logic Findings
-                  <Badge variant="secondary" className="ml-auto text-xs bg-slate-100 text-slate-600">
-                    {logicFindings.length}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <ScrollArea className="h-64">
-                  <div className="p-3 space-y-3">
-                    <p className="text-xs text-muted-foreground mb-2">
-                      논의 내용에서 검토가 필요할 수 있는 부분을 참고용으로 정리했습니다.
-                    </p>
-                    {logicFindings.map(finding => (
-                      <LogicFindingCard
-                        key={finding.id}
-                        finding={finding}
-                        isHighlighted={highlightedFinding === finding.id}
-                        onScrollToLine={scrollToTranscriptLine}
-                      />
-                    ))}
-                  </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="section-evidence-drops">
-              <CardHeader className="py-3 px-4 border-b border-border">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Inbox className="w-4 h-4 text-violet-600" />
-                  Evidence Drops
-                  <Badge variant="secondary" className="ml-auto text-xs bg-violet-100 text-violet-600">
-                    {evidenceDrops.length}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <ScrollArea className="h-48">
-                  <div className="p-3">
-                    <p className="text-xs text-muted-foreground mb-3">
-                      부족한 근거/논리를 보완할 수 있는 추천 자료입니다.
-                    </p>
-                    <ul className="space-y-3">
-                      {evidenceDrops.map(drop => (
-                        <li 
-                          key={drop.id} 
-                          className="group p-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
-                          data-testid={`evidence-drop-${drop.id}`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <h4 className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
-                              {drop.title}
-                            </h4>
-                            <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{drop.summary}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs text-primary">{drop.source}</span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </ScrollArea>
-              </CardContent>
+              <ScrollArea className="flex-1">
+                <ul className="divide-y divide-border/50">
+                  {paragraphSummaries.map(summary => (
+                    <li key={summary.id} className="p-3" data-testid={`summary-${summary.id}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-medium text-primary">{summary.timeRange}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{summary.summary}</p>
+                    </li>
+                  ))}
+                </ul>
+              </ScrollArea>
             </Card>
           </aside>
         </div>

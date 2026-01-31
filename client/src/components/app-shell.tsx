@@ -124,54 +124,63 @@ export function AppShell({ projectId, children }: AppShellProps) {
       >
         <div className="flex-shrink-0 p-4 border-b border-border">
           {!isCollapsed ? (
-            <div className="flex items-center justify-between gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button 
-                    className="flex items-center gap-2 hover:bg-muted rounded-md p-1 -m-1 transition-colors flex-1 min-w-0"
-                    data-testid="dropdown-project-selector"
-                  >
-                    <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center flex-shrink-0">
-                      <span className="text-primary-foreground text-sm font-bold">T</span>
-                    </div>
-                    <div className="flex-1 min-w-0 text-left">
-                      <p className="text-sm font-semibold text-foreground truncate">{currentProject.name}</p>
-                      <p className="text-xs text-muted-foreground">프로젝트</p>
-                    </div>
-                    <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  {projects.map(project => (
-                    <DropdownMenuItem
-                      key={project.id}
-                      onClick={() => handleProjectChange(project.id)}
-                      className="flex items-center justify-between"
-                      data-testid={`menu-item-project-${project.id}`}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button 
+                      className="flex items-center gap-2 hover:bg-muted rounded-md p-1 -m-1 transition-colors flex-1 min-w-0"
+                      data-testid="dropdown-project-selector"
                     >
-                      <span>{project.name}</span>
-                      {project.id === projectId && <Check className="w-4 h-4 text-primary" />}
+                      <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center flex-shrink-0">
+                        <span className="text-primary-foreground text-sm font-bold">T</span>
+                      </div>
+                      <div className="flex-1 min-w-0 text-left">
+                        <p className="text-sm font-semibold text-foreground truncate">{currentProject.name}</p>
+                        <p className="text-xs text-muted-foreground">프로젝트</p>
+                      </div>
+                      <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56">
+                    {projects.map(project => (
+                      <DropdownMenuItem
+                        key={project.id}
+                        onClick={() => handleProjectChange(project.id)}
+                        className="flex items-center justify-between"
+                        data-testid={`menu-item-project-${project.id}`}
+                      >
+                        <span>{project.name}</span>
+                        {project.id === projectId && <Check className="w-4 h-4 text-primary" />}
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuItem 
+                      onClick={() => navigate("/projects")}
+                      className="border-t mt-1 pt-2"
+                      data-testid="menu-item-all-projects"
+                    >
+                      <FolderKanban className="w-4 h-4 mr-2" />
+                      모든 프로젝트 보기
                     </DropdownMenuItem>
-                  ))}
-                  <DropdownMenuItem 
-                    onClick={() => navigate("/projects")}
-                    className="border-t mt-1 pt-2"
-                    data-testid="menu-item-all-projects"
-                  >
-                    <FolderKanban className="w-4 h-4 mr-2" />
-                    모든 프로젝트 보기
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsCollapsed(true)}
-                className="flex-shrink-0 h-8 w-8"
-                data-testid="button-collapse-sidebar"
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsCollapsed(true)}
+                  className="flex-shrink-0 h-8 w-8"
+                  data-testid="button-collapse-sidebar"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+              </div>
+              <button
+                className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors w-full"
+                data-testid="nav-settings"
               >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
+                <Settings className="w-3.5 h-3.5" />
+                설정
+              </button>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2">
@@ -189,6 +198,12 @@ export function AppShell({ projectId, children }: AppShellProps) {
               >
                 <ChevronRight className="w-4 h-4" />
               </Button>
+              <button
+                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                data-testid="nav-settings-collapsed"
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </button>
             </div>
           )}
         </div>
@@ -224,17 +239,6 @@ export function AppShell({ projectId, children }: AppShellProps) {
             ))}
           </ul>
         </nav>
-
-        <div className={`flex-shrink-0 p-3 border-t border-border bg-white ${isCollapsed ? "px-2" : ""}`}>
-          <Button
-            variant="ghost"
-            className={`w-full justify-start ${isCollapsed ? "px-0 justify-center" : ""}`}
-            data-testid="nav-settings"
-          >
-            <Settings className="w-4 h-4" />
-            {!isCollapsed && <span className="ml-2">설정</span>}
-          </Button>
-        </div>
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
