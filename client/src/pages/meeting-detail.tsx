@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useParams, Link } from "wouter";
 import { saveRecentMeeting } from "@/components/app-shell";
 import { useProjectName } from "@/lib/project-context";
@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   ChevronLeft,
   Play,
@@ -30,7 +33,8 @@ import {
   ExternalLink,
   Circle,
   CircleDot,
-  Database
+  Database,
+  Settings
 } from "lucide-react";
 
 type LogicMarkType = "leap" | "missing" | "ambiguous";
@@ -310,12 +314,15 @@ function LogicMarkBadge({
 function TranscriptItem({ 
   line, 
   isActive,
-  onLogicMarkClick
+  onLogicMarkClick,
+  displaySpeaker
 }: { 
   line: TranscriptLine; 
   isActive: boolean;
   onLogicMarkClick?: (findingId: string) => void;
+  displaySpeaker?: string;
 }) {
+  const speakerName = displaySpeaker || line.speaker;
   return (
     <div 
       className={`group flex gap-3 py-3 px-4 rounded-md transition-all ${
@@ -325,12 +332,12 @@ function TranscriptItem({
     >
       <div className="flex-shrink-0 pt-0.5">
         <div className={`w-8 h-8 rounded-full ${line.speakerColor} flex items-center justify-center`}>
-          <span className="text-white text-xs font-medium">{line.speaker.charAt(0)}</span>
+          <span className="text-white text-xs font-medium">{speakerName.charAt(0)}</span>
         </div>
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1 flex-wrap">
-          <span className="text-sm font-medium text-foreground">{line.speaker}</span>
+          <span className="text-sm font-medium text-foreground">{speakerName}</span>
           <span className="text-xs text-muted-foreground">{line.timestamp}</span>
           {line.isHighlight && (
             <Badge variant="secondary" className="text-xs py-0 px-1.5 bg-primary/10 text-primary">
@@ -438,6 +445,27 @@ export default function MeetingDetail() {
   const [actionsSelectMode, setActionsSelectMode] = useState(false);
   const [actionItemsState, setActionItemsState] = useState<ActionItem[]>(actionItemsData);
   const [decisionSummariesState, setDecisionSummariesState] = useState<DecisionSummary[]>(initialDecisionSummaries);
+  
+  const speakerMappingsKey = `trace-pm-speaker-mappings-${meetingId}`;
+  const [speakerMappings, setSpeakerMappings] = useState<Record<string, string>>(() => {
+    const stored = localStorage.getItem(speakerMappingsKey);
+    return stored ? JSON.parse(stored) : {};
+  });
+  const [speakerDialogOpen, setSpeakerDialogOpen] = useState(false);
+  
+  useEffect(() => {
+    localStorage.setItem(speakerMappingsKey, JSON.stringify(speakerMappings));
+  }, [speakerMappings, speakerMappingsKey]);
+  
+  const uniqueSpeakers = useMemo(() => {
+    const speakers = new Set<string>();
+    transcript.forEach(line => speakers.add(line.speaker));
+    return Array.from(speakers);
+  }, []);
+  
+  const getMappedSpeaker = (originalSpeaker: string) => {
+    return speakerMappings[originalSpeaker] || originalSpeaker;
+  };
   
   const { addToMemory, isItemIntegrated, getIntegrationStatus } = useProjectMemory();
   
@@ -739,10 +767,7 @@ export default function MeetingDetail() {
                               data-testid={`decision-checkbox-${decision.id}`}
                             />
                           )}
-                          <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                            decision.status === "confirmed" ? "bg-emerald-500" : 
-                            decision.status === "deferred" ? "bg-amber-500" : "bg-slate-400"
-                          }`} />
+                          <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-foreground" />
                           <span className={`text-sm flex-1 ${isAlreadyIntegrated ? "text-muted-foreground" : "text-foreground"}`}>
                             {decision.title}
                           </span>
@@ -955,7 +980,59 @@ export default function MeetingDetail() {
                     <MessageSquare className="w-4 h-4 text-primary" />
                     Transcript
                   </CardTitle>
-                  <span className="text-xs text-muted-foreground">{transcript.length}개 발언</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{transcript.length}개 발언</span>
+                    <Dialog open={speakerDialogOpen} onOpenChange={setSpeakerDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="ghost" size="icon" data-testid="button-speaker-settings">
+                          <Settings className="w-4 h-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent data-testid="dialog-speaker-settings">
+                        <DialogHeader>
+                          <DialogTitle>화자 이름 설정</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <p className="text-sm text-muted-foreground">
+                            각 화자의 이름을 변경할 수 있습니다. 빈 칸으로 두면 원래 이름이 사용됩니다.
+                          </p>
+                          <div className="space-y-3">
+                            {uniqueSpeakers.map(speaker => (
+                              <div key={speaker} className="flex items-center gap-3">
+                                <Label className="w-24 text-sm flex-shrink-0">{speaker}</Label>
+                                <span className="text-muted-foreground">→</span>
+                                <Input
+                                  placeholder={speaker}
+                                  value={speakerMappings[speaker] || ""}
+                                  onChange={(e) => setSpeakerMappings(prev => ({
+                                    ...prev,
+                                    [speaker]: e.target.value
+                                  }))}
+                                  className="flex-1"
+                                  data-testid={`input-speaker-${speaker}`}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => setSpeakerMappings({})}
+                            data-testid="button-reset-speakers"
+                          >
+                            초기화
+                          </Button>
+                          <Button
+                            onClick={() => setSpeakerDialogOpen(false)}
+                            data-testid="button-save-speakers"
+                          >
+                            저장
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 </div>
               </CardHeader>
               <div className="flex-1 overflow-auto">
@@ -966,6 +1043,7 @@ export default function MeetingDetail() {
                       line={line} 
                       isActive={activeLine === line.id}
                       onLogicMarkClick={scrollToLogicFinding}
+                      displaySpeaker={getMappedSpeaker(line.speaker)}
                     />
                   ))}
                 </div>
