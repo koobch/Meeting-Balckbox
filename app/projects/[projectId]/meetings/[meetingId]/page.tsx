@@ -216,6 +216,24 @@ export default function MeetingDetail() {
         }
       }
 
+      // Pattern 4: [오후 9:27:54] speaker0: text (Korean time format)
+      if (!match) {
+        const koreanMatch = line.match(/^\[(오전|오후)\s+(\d{1,2}:\d{2}:\d{2})\]\s+(speaker\d+):\s*(.*)$/i);
+        if (koreanMatch) {
+          const [, period, time, speaker, text] = koreanMatch;
+          const timestamp = `${period} ${time}`;
+          // Normalize speaker name to match color mapping
+          const normalizedSpeaker = `Speaker ${speaker.replace('speaker', '')}`;
+          return {
+            id: `t-${idx}`,
+            speaker: normalizedSpeaker,
+            speakerColor: speakerColors[normalizedSpeaker] || "bg-slate-400",
+            timestamp,
+            text: text.trim()
+          };
+        }
+      }
+
       if (match) {
         const [, timestamp, speaker, text] = match;
         return {
@@ -250,6 +268,16 @@ export default function MeetingDetail() {
       const result = await getMeetingDetails(meetingId);
       if (result.success && result.data) {
         const { meeting, decisions, actionItems } = result.data;
+
+        // Debug logging for transcript
+        console.log('=== TRANSCRIPT DEBUG ===');
+        console.log('Raw type:', typeof meeting.transcript_with_speakers);
+        console.log('Is null?:', meeting.transcript_with_speakers === null);
+        console.log('Length:', meeting.transcript_with_speakers?.length || 0);
+        if (meeting.transcript_with_speakers) {
+          console.log('First 500 chars:', meeting.transcript_with_speakers.substring(0, 500));
+        }
+
         setMeetingData(meeting);
         setMeetingTitle(meeting.title);
         setTranscript(parseTranscript(meeting.transcript_with_speakers));
@@ -762,7 +790,13 @@ export default function MeetingDetail() {
                       </div>
                     </div>
                   ))}
-                  {transcript.length === 0 && <p className="text-center py-20 text-muted-foreground italic text-sm">대화 기록이 없습니다.</p>}
+                  {transcript.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-20">
+                      <MessageSquare className="w-12 h-12 text-slate-300 mb-3" />
+                      <p className="text-sm text-muted-foreground text-center font-medium mb-1">회의록 데이터가 없습니다</p>
+                      <p className="text-xs text-muted-foreground/60 text-center">음성 녹음 후 자동으로 생성됩니다</p>
+                    </div>
+                  )}
                 </div>
               </ScrollArea>
             </Card>
@@ -817,7 +851,13 @@ export default function MeetingDetail() {
                         </div>
                       </div>
                     ))}
-                    {paragraphSummaries.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">요약 정보가 없습니다.</p>}
+                    {paragraphSummaries.length === 0 && (
+                      <div className="flex flex-col items-center justify-center py-10">
+                        <FileText className="w-12 h-12 text-slate-300 mb-3" />
+                        <p className="text-sm text-muted-foreground text-center font-medium mb-1">단락별 요약이 없습니다</p>
+                        <p className="text-xs text-muted-foreground/60 text-center">회의 분석 후 자동으로 생성됩니다</p>
+                      </div>
+                    )}
                   </div>
                 </ScrollArea>
               </Card>
