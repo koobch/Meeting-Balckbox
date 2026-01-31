@@ -951,12 +951,42 @@ export default function MeetingDetail() {
             </div>
             <Card className="flex flex-col shadow-sm border-border/50">
               <ScrollArea className="h-[600px]">
-                <div className="p-4 w-full h-full">
+                <div className="p-4">
                   {meetingData?.transcript_with_speakers ? (
-                    <div className="w-full">
-                      <pre className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words font-sans m-0 p-0">
-                        {meetingData.transcript_with_speakers}
-                      </pre>
+                    <div className="space-y-4">
+                      {meetingData.transcript_with_speakers.split('\n').filter((line: string) => line.trim()).map((line: string, idx: number) => {
+                        // Parse format: [HH:MM] Speaker X: text
+                        const match = line.match(/^\[(\d{1,2}:\d{2})\]\s+(Speaker\s+\d+):\s+(.+)$/);
+
+                        if (match) {
+                          const [, timestamp, speaker, text] = match;
+
+                          return (
+                            <div key={idx} className="border-b border-border/30 pb-4 last:border-b-0">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                                  {speaker}
+                                </span>
+                                <span className="text-xs text-muted-foreground font-mono">
+                                  {timestamp}
+                                </span>
+                              </div>
+                              <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap break-words">
+                                {text}
+                              </p>
+                            </div>
+                          );
+                        } else {
+                          // Plain text without format
+                          return (
+                            <div key={idx} className="border-b border-border/30 pb-4 last:border-b-0">
+                              <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap break-words">
+                                {line}
+                              </p>
+                            </div>
+                          );
+                        }
+                      })}
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center py-20">
