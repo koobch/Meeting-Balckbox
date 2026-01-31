@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,12 +18,17 @@ import {
   X,
   TriangleAlert,
   CircleSlash,
-  ExternalLink
+  ExternalLink,
+  ArrowUpDown,
+  SlidersHorizontal
 } from "lucide-react";
 
 type Status = "draft" | "integrated";
 type EvidenceStrength = "strong" | "medium" | "weak";
 type FilterType = "weak" | "logic-flags" | "missing-evidence" | null;
+type StatusFilter = "weak" | "flags" | "integrated" | null;
+type SortType = "recent" | "risk";
+type CardVisibility = { decisions: boolean; meetings: boolean };
 
 interface DecisionData {
   id: string;
@@ -611,30 +616,191 @@ function EvidenceDropsCard() {
   );
 }
 
+function FilterSortBar({
+  statusFilter,
+  onStatusFilterChange,
+  sortType,
+  onSortChange,
+  visibility,
+  onVisibilityChange
+}: {
+  statusFilter: StatusFilter;
+  onStatusFilterChange: (filter: StatusFilter) => void;
+  sortType: SortType;
+  onSortChange: (sort: SortType) => void;
+  visibility: CardVisibility;
+  onVisibilityChange: (visibility: CardVisibility) => void;
+}) {
+  const toggleButtons = [
+    { key: "weak" as const, label: "Weak only" },
+    { key: "flags" as const, label: "Flags only" },
+    { key: "integrated" as const, label: "Integrated only" }
+  ];
+
+  return (
+    <div className="flex items-center gap-6 py-3 border-b border-border mb-6" data-testid="filter-sort-bar">
+      <div className="flex items-center gap-1">
+        <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground mr-1" />
+        {toggleButtons.map(btn => (
+          <button
+            key={btn.key}
+            onClick={() => onStatusFilterChange(statusFilter === btn.key ? null : btn.key)}
+            className={`px-2.5 py-1 text-xs rounded-md transition-all ${
+              statusFilter === btn.key
+                ? "bg-foreground text-background font-medium"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            }`}
+            data-testid={`filter-${btn.key}`}
+          >
+            {btn.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="w-px h-4 bg-border" />
+
+      <div className="flex items-center gap-1">
+        <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground mr-1" />
+        <button
+          onClick={() => onSortChange("recent")}
+          className={`px-2.5 py-1 text-xs rounded-md transition-all ${
+            sortType === "recent"
+              ? "bg-foreground text-background font-medium"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted"
+          }`}
+          data-testid="sort-recent"
+        >
+          Recent
+        </button>
+        <button
+          onClick={() => onSortChange("risk")}
+          className={`px-2.5 py-1 text-xs rounded-md transition-all ${
+            sortType === "risk"
+              ? "bg-foreground text-background font-medium"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted"
+          }`}
+          data-testid="sort-risk"
+        >
+          Risk first
+        </button>
+      </div>
+
+      <div className="w-px h-4 bg-border" />
+
+      <div className="flex items-center gap-3">
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <Checkbox
+            checked={visibility.decisions}
+            onCheckedChange={(checked) => onVisibilityChange({ ...visibility, decisions: !!checked })}
+            className="w-3.5 h-3.5"
+            data-testid="toggle-decisions"
+          />
+          <span className={`text-xs ${visibility.decisions ? "text-foreground" : "text-muted-foreground"}`}>
+            Decisions
+          </span>
+        </label>
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <Checkbox
+            checked={visibility.meetings}
+            onCheckedChange={(checked) => onVisibilityChange({ ...visibility, meetings: !!checked })}
+            className="w-3.5 h-3.5"
+            data-testid="toggle-meetings"
+          />
+          <span className={`text-xs ${visibility.meetings ? "text-foreground" : "text-muted-foreground"}`}>
+            Meetings
+          </span>
+        </label>
+      </div>
+    </div>
+  );
+}
+
 export default function ProjectOverview() {
   const params = useParams<{ id: string }>();
   const [activeFilter, setActiveFilter] = useState<FilterType>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
+  const [sortType, setSortType] = useState<SortType>("recent");
+  const [visibility, setVisibility] = useState<CardVisibility>({ decisions: true, meetings: true });
 
-  const filterItems = <T extends { strength: EvidenceStrength; evidenceCount: number; hasLogicFlag?: boolean }>(items: T[]): T[] => {
-    if (!activeFilter) return items;
-    
-    switch (activeFilter) {
-      case "weak":
-        return items.filter(item => item.strength === "weak");
-      case "logic-flags":
-        return items.filter(item => item.hasLogicFlag);
-      case "missing-evidence":
-        return items.filter(item => item.evidenceCount < 3);
-      default:
-        return items;
-    }
+  const getPriorityScore = (item: { strength: EvidenceStrength; hasLogicFlag?: boolean; priority?: string }) => {
+    let score = 0;
+    if (item.strength === "weak") score += 3;
+    else if (item.strength === "medium") score += 2;
+    if (item.hasLogicFlag) score += 2;
+    if (item.priority === "high") score += 3;
+    else if (item.priority === "medium") score += 1;
+    return score;
   };
 
-  const filteredDecisions = filterItems(decisions);
-  const filteredMeetings = filterItems(meetings);
-  const filteredGaps = filterItems(gaps);
+  const filterAndSortItems = <T extends { 
+    strength: EvidenceStrength; 
+    evidenceCount: number; 
+    hasLogicFlag?: boolean;
+    status: Status;
+    createdAt?: string;
+    date?: string;
+    priority?: string;
+  }>(items: T[]): T[] => {
+    let result = [...items];
+    
+    if (activeFilter) {
+      switch (activeFilter) {
+        case "weak":
+          result = result.filter(item => item.strength === "weak");
+          break;
+        case "logic-flags":
+          result = result.filter(item => item.hasLogicFlag);
+          break;
+        case "missing-evidence":
+          result = result.filter(item => item.evidenceCount < 3);
+          break;
+      }
+    }
+
+    if (statusFilter) {
+      switch (statusFilter) {
+        case "weak":
+          result = result.filter(item => item.strength === "weak");
+          break;
+        case "flags":
+          result = result.filter(item => item.hasLogicFlag);
+          break;
+        case "integrated":
+          result = result.filter(item => item.status === "integrated");
+          break;
+      }
+    }
+
+    if (sortType === "recent") {
+      result.sort((a, b) => {
+        const dateA = a.createdAt || a.date || "";
+        const dateB = b.createdAt || b.date || "";
+        return dateB.localeCompare(dateA);
+      });
+    } else {
+      result.sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
+    }
+
+    return result;
+  };
+
+  const filteredDecisions = useMemo(() => 
+    visibility.decisions ? filterAndSortItems(decisions) : [], 
+    [activeFilter, statusFilter, sortType, visibility.decisions]
+  );
+  
+  const filteredMeetings = useMemo(() => 
+    visibility.meetings ? filterAndSortItems(meetings) : [], 
+    [activeFilter, statusFilter, sortType, visibility.meetings]
+  );
+  
+  const filteredGaps = useMemo(() => 
+    filterAndSortItems(gaps), 
+    [activeFilter, statusFilter, sortType]
+  );
 
   const hasResults = filteredDecisions.length > 0 || filteredMeetings.length > 0 || filteredGaps.length > 0;
+  const hasActiveFilters = activeFilter !== null || statusFilter !== null;
   
   return (
     <div className="min-h-screen bg-background">
@@ -672,28 +838,60 @@ export default function ProjectOverview() {
               </div>
             </section>
 
-            {activeFilter && (
-              <div className="mb-4 flex items-center gap-2" data-testid="filter-indicator">
-                <Badge variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-1">
-                  <span className="text-xs">
-                    필터: {activeFilter === "weak" ? "Weak Evidence" : activeFilter === "logic-flags" ? "Logic Flags" : "Missing Evidence"}
-                  </span>
-                  <button 
-                    onClick={() => setActiveFilter(null)}
-                    className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20"
-                    data-testid="button-clear-filter"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </Badge>
+            <FilterSortBar
+              statusFilter={statusFilter}
+              onStatusFilterChange={setStatusFilter}
+              sortType={sortType}
+              onSortChange={setSortType}
+              visibility={visibility}
+              onVisibilityChange={setVisibility}
+            />
+
+            {hasActiveFilters && (
+              <div className="mb-4 flex items-center gap-2 flex-wrap" data-testid="filter-indicator">
+                {activeFilter && (
+                  <Badge variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-1">
+                    <span className="text-xs">
+                      {activeFilter === "weak" ? "Weak Evidence" : activeFilter === "logic-flags" ? "Logic Flags" : "Missing Evidence"}
+                    </span>
+                    <button 
+                      onClick={() => setActiveFilter(null)}
+                      className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20"
+                      data-testid="button-clear-sidebar-filter"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                )}
+                {statusFilter && (
+                  <Badge variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-1">
+                    <span className="text-xs">
+                      {statusFilter === "weak" ? "Weak only" : statusFilter === "flags" ? "Flags only" : "Integrated only"}
+                    </span>
+                    <button 
+                      onClick={() => setStatusFilter(null)}
+                      className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20"
+                      data-testid="button-clear-status-filter"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                )}
+                <button
+                  onClick={() => { setActiveFilter(null); setStatusFilter(null); }}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  data-testid="button-clear-all-filters"
+                >
+                  모두 해제
+                </button>
               </div>
             )}
 
-            {!hasResults && activeFilter && (
+            {!hasResults && hasActiveFilters && (
               <div className="py-12 text-center" data-testid="empty-filter-result">
                 <p className="text-muted-foreground">해당 필터에 맞는 항목이 없습니다.</p>
                 <button 
-                  onClick={() => setActiveFilter(null)}
+                  onClick={() => { setActiveFilter(null); setStatusFilter(null); }}
                   className="mt-2 text-sm text-primary hover:underline"
                 >
                   필터 해제
