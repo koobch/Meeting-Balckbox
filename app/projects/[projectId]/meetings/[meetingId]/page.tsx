@@ -64,8 +64,8 @@ interface TranscriptLine {
 
 interface Topic {
   id: string;
-  title: string;
-  startTime: string;
+  topic: string;
+  timestamp: string;
 }
 
 interface ActionItem {
@@ -79,7 +79,9 @@ interface ActionItem {
 
 interface ParagraphSummary {
   id: string;
-  timeRange: string;
+  start_time: string;
+  end_time: string;
+  title: string;
   summary: string;
 }
 
@@ -199,11 +201,27 @@ export default function MeetingDetail() {
         setMeetingTitle(meeting.title);
         setTranscript(parseTranscript(meeting.transcript_with_speakers));
 
-        setTopics((meeting.topics || []).map((t: string, idx: number) => ({
-          id: `topic-${idx}`,
-          title: t,
-          startTime: "00:00"
-        })));
+        // Parse Topics JSON
+        let rawTopics = meeting.topics || [];
+        if (rawTopics.length === 1 && typeof rawTopics[0] === 'string' && rawTopics[0].startsWith('[')) {
+          try { rawTopics = JSON.parse(rawTopics[0]); } catch (e) { }
+        }
+
+        setTopics((rawTopics || []).map((t: any, idx: number) => {
+          if (typeof t === 'string' && t.startsWith('{')) {
+            try {
+              const parsed = JSON.parse(t);
+              return { id: `topic-${idx}`, ...parsed };
+            } catch (e) {
+              return { id: `topic-${idx}`, topic: t, timestamp: "00:00" };
+            }
+          }
+          return {
+            id: `topic-${idx}`,
+            topic: t.topic || t.title || t,
+            timestamp: t.timestamp || t.start_time || "00:00"
+          };
+        }));
 
         setActionItemsState(actionItems.map((ai: any) => ({
           id: ai.id,
@@ -221,12 +239,30 @@ export default function MeetingDetail() {
           integrationStatus: d.is_integrated ? "integrated" : "not"
         })));
 
+        // Parse Timeline Summary JSON
         if (meeting.timeline_summary) {
-          setParagraphSummaries([{
-            id: "ps-1",
-            timeRange: "00:00 - End",
-            summary: meeting.timeline_summary
-          }]);
+          try {
+            const parsed = JSON.parse(meeting.timeline_summary);
+            if (Array.isArray(parsed)) {
+              setParagraphSummaries(parsed.map((ps: any, idx: number) => ({
+                id: `ps-${idx}`,
+                start_time: ps.start_time || "00:00",
+                end_time: ps.end_time || "",
+                title: ps.title || "요약",
+                summary: ps.summary || ""
+              })));
+            } else {
+              throw new Error("Not an array");
+            }
+          } catch (e) {
+            setParagraphSummaries([{
+              id: "ps-1",
+              start_time: "00:00",
+              end_time: "End",
+              title: "전체 요약",
+              summary: meeting.timeline_summary
+            }]);
+          }
         }
       }
     } catch (err) {
@@ -303,131 +339,158 @@ export default function MeetingDetail() {
         </div>
       </header>
 
-      <div className="p-6 space-y-8">
-        {/* 주요 주제 섹션 */}
-        <section>
-          <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-            <Bookmark className="w-4 h-4 text-primary" />
-            주요 주제
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            {topics.map(topic => (
-              <Badge key={topic.id} variant="secondary" className="px-3 py-1 bg-muted/50 hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer" onClick={() => scrollToTime(topic.startTime)}>
-                {topic.title}
-              </Badge>
-            ))}
-          </div>
-        </section>
+      <div className="flex-1 min-h-0 flex flex-col p-6 overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full min-h-0">
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* 의사결정 사항 */}
-          <Card>
-            <CardHeader className="py-3 px-4 border-b border-border flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
+          {/* 회의록 (좌측 - 7개 컬럼 차지) */}
+          <section className="lg:col-span-7 flex flex-col min-h-0 h-full">
+            <div className="flex items-center justify-between mb-3 px-1 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-blue-500" />
+                <h2 className="text-sm font-semibold text-foreground">회의록</h2>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="text-xs text-muted-foreground">{transcript.length}개 발언</span>
+                <button className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <UserCog className="w-3.5 h-3.5" />
+                  화자 지정
+                </button>
+              </div>
+            </div>
+            <Card className="flex-1 flex flex-col min-h-0 overflow-hidden shadow-sm border-border/50">
+              <ScrollArea className="flex-1">
+                <div className="p-4 space-y-6">
+                  {transcript.map((line) => (
+                    <div
+                      key={line.id}
+                      className={`flex gap-4 group transition-colors ${activeLine === line.id ? "bg-primary/5 -mx-2 px-2 py-2 rounded-lg" : ""}`}
+                      data-testid={`transcript-line-${line.id}`}
+                    >
+                      <div className="flex-shrink-0 pt-1">
+                        <div className={`w-9 h-9 rounded-full ${line.speakerColor} flex items-center justify-center text-white text-xs font-bold shadow-sm`}>
+                          {line.speaker.replace("Speaker ", "").charAt(0)}
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-bold text-foreground/90">{line.speaker}</span>
+                          <span className="text-xs text-muted-foreground/70 font-mono">{line.timestamp}</span>
+                          {line.isHighlight && (
+                            <Badge variant="secondary" className="bg-blue-50 text-[10px] text-blue-500 hover:bg-blue-50 py-0 h-4 border-none">핵심</Badge>
+                          )}
+                        </div>
+                        <p className="text-[13.5px] leading-relaxed text-foreground/80 break-words">{line.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {transcript.length === 0 && <p className="text-center py-20 text-muted-foreground italic text-sm">대화 기록이 없습니다.</p>}
+                </div>
+              </ScrollArea>
+            </Card>
+          </section>
+
+          {/* 정보 패널 (우측 - 5개 컬럼 차지) */}
+          <div className="lg:col-span-5 flex flex-col gap-6 min-h-0 h-full overflow-y-auto pr-2 scrollbar-hide">
+
+            {/* 주요 주제 */}
+            <section className="flex flex-col shrink-0">
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <Bookmark className="w-4 h-4 text-violet-500" />
+                <h2 className="text-sm font-semibold text-foreground">주요 주제</h2>
+              </div>
+              <Card className="shadow-sm border-border/50">
+                <div className="p-1">
+                  {topics.map((topic, idx) => (
+                    <button
+                      key={topic.id}
+                      onClick={() => scrollToTime(topic.timestamp)}
+                      className={`w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-muted/50 transition-colors text-left ${idx !== topics.length - 1 ? 'border-b border-border/40' : ''}`}
+                    >
+                      <span className="font-medium text-foreground/80 truncate pr-4">{topic.topic}</span>
+                      <span className="text-xs font-mono text-muted-foreground shrink-0">{topic.timestamp}</span>
+                    </button>
+                  ))}
+                  {topics.length === 0 && <p className="text-center py-6 text-muted-foreground text-xs italic">주제 분석 정보가 없습니다.</p>}
+                </div>
+              </Card>
+            </section>
+
+            {/* 의사결정 사항 */}
+            <section className="flex flex-col shrink-0">
+              <div className="flex items-center gap-2 mb-3 px-1">
                 <Lightbulb className="w-4 h-4 text-amber-500" />
-                의사결정 사항
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="h-[300px]">
+                <h2 className="text-sm font-semibold text-foreground">의사결정 사항</h2>
+              </div>
+              <Card className="shadow-sm border-border/50">
                 <div className="p-4 space-y-3">
-                  {decisionSummariesState.map(decision => (
-                    <div key={decision.id} className="flex items-start gap-3 p-3 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors">
-                      <Checkbox checked={decision.integrationStatus === "integrated"} disabled />
+                  {decisionSummariesState.map((decision, idx) => (
+                    <div key={decision.id} className={`flex items-start gap-3 ${idx !== decisionSummariesState.length - 1 ? 'border-b border-border/20 pb-3' : ''}`}>
+                      <Checkbox checked={decision.integrationStatus === "integrated"} disabled className="mt-0.5" />
                       <div>
-                        <p className="text-sm font-medium">{decision.title}</p>
-                        <Badge variant="outline" className="text-[10px] mt-1 uppercase">
+                        <p className="text-sm font-medium text-foreground/90">{decision.title}</p>
+                        <Badge variant="outline" className="text-[10px] mt-1 uppercase text-muted-foreground/70 scale-90 origin-left">
                           {decision.integrationStatus}
                         </Badge>
                       </div>
                     </div>
                   ))}
-                  {decisionSummariesState.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">기록된 의사결정 사항이 없습니다.</p>}
+                  {decisionSummariesState.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">기록된 사항이 없습니다.</p>}
                 </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
+              </Card>
+            </section>
 
-          {/* 다음 할 일 */}
-          <Card>
-            <CardHeader className="py-3 px-4 border-b border-border flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
+            {/* 다음 할 일 */}
+            <section className="flex flex-col shrink-0">
+              <div className="flex items-center gap-2 mb-3 px-1">
                 <CheckSquare className="w-4 h-4 text-emerald-500" />
-                다음 할 일
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="h-[300px]">
+                <h2 className="text-sm font-semibold text-foreground">다음 할 일</h2>
+              </div>
+              <Card className="shadow-sm border-border/50">
                 <div className="p-4 space-y-3">
-                  {actionItemsState.map(item => (
-                    <div key={item.id} className="flex items-start gap-3 p-3 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors">
-                      <Checkbox checked={item.completed} disabled />
+                  {actionItemsState.map((item, idx) => (
+                    <div key={item.id} className={`flex items-start gap-3 ${idx !== actionItemsState.length - 1 ? 'border-b border-border/20 pb-3' : ''}`}>
+                      <Checkbox checked={item.completed} disabled className="mt-0.5" />
                       <div className="flex-1">
-                        <p className={`text-sm font-medium ${item.completed ? 'line-through text-muted-foreground' : ''}`}>{item.task}</p>
+                        <p className={`text-sm font-medium ${item.completed ? 'line-through text-muted-foreground' : 'text-foreground/90'}`}>{item.task}</p>
                         <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="secondary" className="text-[10px]">{item.assignee}</Badge>
-                          {item.dueDate && <span className="text-[10px] text-muted-foreground italic">~{item.dueDate}</span>}
+                          <Badge variant="secondary" className="text-[10px] py-0 px-2 bg-muted/50">{item.assignee}</Badge>
+                          {item.dueDate && <span className="text-[10px] text-muted-foreground font-mono">~{item.dueDate}</span>}
                         </div>
                       </div>
                     </div>
                   ))}
-                  {actionItemsState.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">등록된 할 일이 없습니다.</p>}
+                  {actionItemsState.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">할 일이 없습니다.</p>}
                 </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </div>
+              </Card>
+            </section>
 
-        {/* 단락별 요약 */}
-        {paragraphSummaries.length > 0 && (
-          <section>
-            <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-              <FileText className="w-4 h-4 text-blue-500" />
-              단락별 요약
-            </h2>
-            <Card className="bg-muted/30">
-              <CardContent className="p-4">
-                {paragraphSummaries.map(ps => (
-                  <div key={ps.id} className="space-y-1">
-                    <p className="text-xs text-muted-foreground font-mono">{ps.timeRange}</p>
-                    <p className="text-sm leading-relaxed">{ps.summary}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </section>
-        )}
-
-        {/* 전체 대화 기록 */}
-        <section>
-          <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-violet-500" />
-            전체 대화 기록
-          </h2>
-          <div className="space-y-4 rounded-lg border border-border p-4 bg-muted/10">
-            {transcript.map((line) => (
-              <div
-                key={line.id}
-                className={`flex gap-3 py-2 px-3 rounded-md transition-colors ${activeLine === line.id ? "bg-primary/10 ring-1 ring-primary/20" : "hover:bg-muted/50"}`}
-                data-testid={`transcript-line-${line.id}`}
-              >
-                <div className="flex-shrink-0 pt-1">
-                  <div className={`w-8 h-8 rounded-full ${line.speakerColor} flex items-center justify-center text-white text-[10px] font-bold`}>
-                    {line.speaker.replace("Speaker ", "")}
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-xs font-bold">{line.speaker}</span>
-                    <span className="text-[10px] text-muted-foreground">{line.timestamp}</span>
-                  </div>
-                  <p className="text-sm leading-relaxed text-foreground/90">{line.text}</p>
-                </div>
+            {/* 단락별 요약 */}
+            <section className="flex flex-col shrink-0">
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <FileText className="w-4 h-4 text-orange-500" />
+                <h2 className="text-sm font-semibold text-foreground">단락별 요약</h2>
               </div>
-            ))}
-            {transcript.length === 0 && <p className="text-center py-10 text-muted-foreground italic text-sm">대화 기록이 없습니다.</p>}
+              <Card className="shadow-sm border-border/50">
+                <div className="p-4 space-y-6">
+                  {paragraphSummaries.map((ps, idx) => (
+                    <div key={ps.id} className={`${idx !== paragraphSummaries.length - 1 ? 'border-b border-border/40 pb-6' : ''}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs font-bold text-blue-500 font-mono tracking-tight bg-blue-50 px-2 py-0.5 rounded">
+                          {ps.start_time} - {ps.end_time}
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold text-foreground/90">{ps.title}</p>
+                        <p className="text-[13.5px] leading-relaxed text-foreground/80">{ps.summary}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {paragraphSummaries.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">요약 정보가 없습니다.</p>}
+                </div>
+              </Card>
+            </section>
           </div>
-        </section>
+        </div>
       </div>
     </div>
   );
