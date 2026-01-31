@@ -1,8 +1,13 @@
 import { useState, useMemo } from "react";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { 
   Lightbulb, 
   Calendar, 
@@ -82,6 +87,21 @@ interface EvidenceDrop {
   summary: string;
   source: string;
   addedAt: string;
+}
+
+interface CalendarDay {
+  date: string;
+  day: number;
+  hasMeeting: boolean;
+  integrationStatus: "integrated" | "partial" | "not" | null;
+  meetingId: string | null;
+  meetingTitle: string | null;
+  summary: {
+    decisionsCount: number;
+    integratedDecisions: number;
+    evidenceCount: number;
+    missingEvidence: number;
+  } | null;
 }
 
 const keywords = [
@@ -225,6 +245,202 @@ const evidenceDrops: EvidenceDrop[] = [
     addedAt: "1일 전"
   }
 ];
+
+function generateCalendarData(): CalendarDay[] {
+  const year = 2025;
+  const month = 0; // January
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayOfWeek = new Date(year, month, 1).getDay();
+  
+  const meetingsMap: Record<number, { 
+    meetingId: string; 
+    meetingTitle: string;
+    status: "integrated" | "partial" | "not"; 
+    summary: CalendarDay["summary"];
+  }> = {
+    6: { 
+      meetingId: "m1", 
+      meetingTitle: "킥오프 미팅",
+      status: "integrated",
+      summary: { decisionsCount: 3, integratedDecisions: 3, evidenceCount: 8, missingEvidence: 0 }
+    },
+    10: { 
+      meetingId: "m2", 
+      meetingTitle: "기술 스택 논의",
+      status: "integrated",
+      summary: { decisionsCount: 2, integratedDecisions: 2, evidenceCount: 5, missingEvidence: 0 }
+    },
+    15: { 
+      meetingId: "m3", 
+      meetingTitle: "사용자 리서치 리뷰",
+      status: "partial",
+      summary: { decisionsCount: 4, integratedDecisions: 2, evidenceCount: 6, missingEvidence: 2 }
+    },
+    20: { 
+      meetingId: "m4", 
+      meetingTitle: "MVP 범위 확정",
+      status: "integrated",
+      summary: { decisionsCount: 5, integratedDecisions: 5, evidenceCount: 12, missingEvidence: 0 }
+    },
+    22: { 
+      meetingId: "m5", 
+      meetingTitle: "디자인 리뷰",
+      status: "partial",
+      summary: { decisionsCount: 3, integratedDecisions: 1, evidenceCount: 4, missingEvidence: 3 }
+    },
+    25: { 
+      meetingId: "m6", 
+      meetingTitle: "스프린트 계획",
+      status: "not",
+      summary: { decisionsCount: 2, integratedDecisions: 0, evidenceCount: 1, missingEvidence: 4 }
+    },
+    29: { 
+      meetingId: "m7", 
+      meetingTitle: "가격 정책 논의",
+      status: "not",
+      summary: { decisionsCount: 3, integratedDecisions: 0, evidenceCount: 2, missingEvidence: 5 }
+    }
+  };
+  
+  const days: CalendarDay[] = [];
+  
+  for (let i = 0; i < firstDayOfWeek; i++) {
+    days.push({
+      date: "",
+      day: 0,
+      hasMeeting: false,
+      integrationStatus: null,
+      meetingId: null,
+      meetingTitle: null,
+      summary: null
+    });
+  }
+  
+  for (let day = 1; day <= daysInMonth; day++) {
+    const meeting = meetingsMap[day];
+    days.push({
+      date: `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+      day,
+      hasMeeting: !!meeting,
+      integrationStatus: meeting?.status || null,
+      meetingId: meeting?.meetingId || null,
+      meetingTitle: meeting?.meetingTitle || null,
+      summary: meeting?.summary || null
+    });
+  }
+  
+  return days;
+}
+
+const calendarData = generateCalendarData();
+
+function MeetingIntegrationCalendar({ projectId }: { projectId: string }) {
+  const [, setLocation] = useLocation();
+  const weekDays = ["일", "월", "화", "수", "목", "금", "토"];
+  
+  const getStatusColor = (day: CalendarDay) => {
+    if (!day.hasMeeting) return "bg-muted/50 text-muted-foreground";
+    switch (day.integrationStatus) {
+      case "integrated": return "bg-emerald-500 text-white";
+      case "partial": return "bg-amber-400 text-white";
+      case "not": return "bg-red-500 text-white";
+      default: return "bg-muted/50 text-muted-foreground";
+    }
+  };
+  
+  const getStatusLabel = (status: CalendarDay["integrationStatus"]) => {
+    switch (status) {
+      case "integrated": return "완전 통합됨";
+      case "partial": return "부분 통합됨";
+      case "not": return "통합 안됨";
+      default: return "";
+    }
+  };
+  
+  const handleDayClick = (day: CalendarDay) => {
+    if (day.hasMeeting && day.meetingId) {
+      setLocation(`/projects/${projectId}/meetings/${day.meetingId}`);
+    }
+  };
+  
+  return (
+    <Card data-testid="card-meeting-calendar">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-primary" />
+            Meeting Integration Calendar
+          </CardTitle>
+          <span className="text-xs text-muted-foreground">2025년 1월</span>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {weekDays.map(day => (
+            <div key={day} className="text-center text-xs font-medium text-muted-foreground py-1">
+              {day}
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {calendarData.map((day, index) => (
+            day.day === 0 ? (
+              <div key={`empty-${index}`} className="aspect-square" />
+            ) : (
+              <Tooltip key={day.date}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => handleDayClick(day)}
+                    className={`aspect-square rounded-md flex items-center justify-center text-xs font-medium transition-all ${getStatusColor(day)} ${day.hasMeeting ? 'cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-primary/50' : 'cursor-default'}`}
+                    data-testid={`calendar-day-${day.day}`}
+                    disabled={!day.hasMeeting}
+                  >
+                    {day.day}
+                  </button>
+                </TooltipTrigger>
+                {day.hasMeeting && day.summary && (
+                  <TooltipContent side="top" className="max-w-[200px] p-3">
+                    <div className="space-y-1.5">
+                      <p className="font-medium text-xs">{day.meetingTitle}</p>
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        <p>결정 {day.summary.integratedDecisions}/{day.summary.decisionsCount}개 통합</p>
+                        <p>근거 {day.summary.evidenceCount}개 {day.summary.missingEvidence > 0 ? `(${day.summary.missingEvidence}개 부족)` : ''}</p>
+                      </div>
+                      <p className={`text-xs font-medium ${
+                        day.integrationStatus === 'integrated' ? 'text-emerald-600' :
+                        day.integrationStatus === 'partial' ? 'text-amber-600' : 'text-red-600'
+                      }`}>
+                        {getStatusLabel(day.integrationStatus)}
+                      </p>
+                    </div>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            )
+          ))}
+        </div>
+        <div className="flex items-center justify-center gap-4 mt-4 text-xs">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-emerald-500" />
+            <span className="text-muted-foreground">통합됨</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-amber-400" />
+            <span className="text-muted-foreground">부분 통합</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-red-500" />
+            <span className="text-muted-foreground">미통합</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-muted/50 border border-border" />
+            <span className="text-muted-foreground">회의 없음</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 function StatusBadge({ status }: { status: Status }) {
   return (
@@ -800,6 +1016,7 @@ export default function ProjectOverview() {
             <LiveBriefCard />
             <ActionItemsCard />
           </div>
+          <MeetingIntegrationCalendar projectId={params.projectId || "1"} />
           <DecisionIntegrityCard 
             activeFilter={activeFilter} 
             onFilterChange={setActiveFilter} 
