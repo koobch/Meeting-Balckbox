@@ -15,7 +15,8 @@ import {
   ChevronDown,
   Check,
   FolderKanban,
-  Clock
+  Clock,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +35,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useProject } from "@/lib/project-context";
-import VoiceRecorder from "@/components/VoiceRecorder";
+import { transcribeAudio } from "@/app/actions/transcribe";
+import { createMeeting } from "@/app/actions/meetings";
 
 interface NavItem {
   href: string;
@@ -80,10 +82,11 @@ export function AppShell({ projectId, children }: AppShellProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const [showTitleDialog, setShowTitleDialog] = useState(false);
-  const [meetingTitle, setMeetingTitle] = useState("");
   const [recentMeetings, setRecentMeetings] = useState<RecentMeeting[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const { projects, currentProject } = useProject();
 
   useEffect(() => {
@@ -119,32 +122,91 @@ export function AppShell({ projectId, children }: AppShellProps) {
     };
   }, []);
 
-  const startRecording = () => {
-    if (isRecording) return;
-    setIsRecording(true);
-    setRecordingTime(0);
-    intervalRef.current = setInterval(() => {
-      setRecordingTime(prev => prev + 1);
-    }, 1000);
+  const startRecording = async () => {
+    if (isRecording || isProcessing) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const options = { mimeType: 'audio/webm' };
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options.mimeType = 'audio/ogg';
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, options);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: options.mimeType });
+        await processRecording(audioBlob, recordingTime);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+
+      intervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error("Microphone access failed:", err);
+      alert("Microphone access is required to record audio.");
+    }
   };
 
   const stopRecording = () => {
     if (!isRecording) return;
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+
     setIsRecording(false);
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    setShowTitleDialog(true);
   };
 
-  const saveMeeting = () => {
-    const title = meetingTitle.trim() || `미팅 ${new Date().toLocaleDateString('ko-KR')}`;
-    console.log("Meeting saved:", { title, duration: recordingTime });
-    setShowTitleDialog(false);
-    setMeetingTitle("");
-    setRecordingTime(0);
-    router.push(`/projects/${projectId}/meetings`);
+  const processRecording = async (blob: Blob, duration: number) => {
+    setIsProcessing(true);
+    try {
+      // 1. Transcribe (Uploads to Supabase internally in the action)
+      const formData = new FormData();
+      formData.append('file', blob);
+
+      const transcribeResult = await transcribeAudio(formData);
+      if ('error' in transcribeResult) throw new Error(transcribeResult.error);
+
+      // 2. Save to DB
+      const saveResult = await createMeeting({
+        title: `Meeting ${new Date().toLocaleString('ko-KR')}`,
+        projectId: projectId,
+        durationSeconds: duration,
+        transcript: transcribeResult.text as string,
+        audioUrl: transcribeResult.audioUrl as string,
+        participants: []
+      });
+
+      if (!saveResult.success) throw new Error(saveResult.error);
+
+      alert("Meeting saved and processed successfully!");
+      router.push(`/projects/${projectId}/meetings`);
+      router.refresh(); // Refresh list
+    } catch (err: any) {
+      console.error("Failed to process recording:", err);
+      alert("Failed to save and process recording: " + err.message);
+    } finally {
+      setIsProcessing(false);
+      setRecordingTime(0);
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -251,20 +313,35 @@ export function AppShell({ projectId, children }: AppShellProps) {
         </div>
 
         <div className={`flex-shrink-0 p-3 ${isCollapsed ? "px-2" : ""}`}>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button
-                className={`w-full bg-primary hover:bg-primary/90 ${isCollapsed ? "px-0" : ""}`}
-                data-testid="button-start-recording"
-              >
-                <Mic className="w-4 h-4" />
-                {!isCollapsed && <span className="ml-2">New Recording</span>}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md bg-transparent border-none shadow-none p-0">
-              <VoiceRecorder projectId={projectId} />
-            </DialogContent>
-          </Dialog>
+          {isProcessing ? (
+            <Button
+              disabled
+              className={`w-full bg-slate-400 text-white ${isCollapsed ? "px-0" : ""}`}
+            >
+              <Loader2 className="w-4 h-4 animate-spin" />
+              {!isCollapsed && <span className="ml-2">Processing...</span>}
+            </Button>
+          ) : isRecording ? (
+            <Button
+              onClick={stopRecording}
+              className={`w-full bg-red-500 hover:bg-red-600 text-white animate-pulse ${isCollapsed ? "px-0" : ""}`}
+              data-testid="button-stop-recording"
+            >
+              <Square className="w-4 h-4" />
+              {!isCollapsed && (
+                <span className="ml-2">Stop {formatTime(recordingTime)}</span>
+              )}
+            </Button>
+          ) : (
+            <Button
+              onClick={startRecording}
+              className={`w-full bg-primary hover:bg-primary/90 ${isCollapsed ? "px-0" : ""}`}
+              data-testid="button-start-recording"
+            >
+              <Mic className="w-4 h-4" />
+              {!isCollapsed && <span className="ml-2">New Recording</span>}
+            </Button>
+          )}
         </div>
 
         <nav className="flex-1 p-3 overflow-auto min-h-0">
@@ -302,41 +379,6 @@ export function AppShell({ projectId, children }: AppShellProps) {
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         {children}
       </main>
-
-      <Dialog open={showTitleDialog} onOpenChange={setShowTitleDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>미팅 제목 설정</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <Input
-              placeholder="미팅 제목을 입력하세요"
-              value={meetingTitle}
-              onChange={(e) => setMeetingTitle(e.target.value)}
-              data-testid="input-meeting-title"
-              autoFocus
-            />
-            <p className="text-sm text-muted-foreground mt-2">
-              녹음 시간: {formatTime(recordingTime)}
-            </p>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowTitleDialog(false)}
-              data-testid="button-cancel-save"
-            >
-              취소
-            </Button>
-            <Button
-              onClick={saveMeeting}
-              data-testid="button-save-meeting"
-            >
-              저장
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
