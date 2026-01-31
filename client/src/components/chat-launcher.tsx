@@ -2,14 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, Bot, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { Card } from "@/components/ui/card";
 
 interface Message {
   id: string;
@@ -33,7 +26,6 @@ export function ChatLauncher() {
   const [inputValue, setInputValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -84,7 +76,7 @@ export function ChatLauncher() {
     <>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed left-5 bottom-5 z-[999] w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all duration-200 ${
+        className={`fixed left-5 bottom-5 z-50 w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all duration-200 ${
           isOpen
             ? "bg-muted text-muted-foreground shadow-lg"
             : "bg-primary text-primary-foreground shadow-lg hover:scale-[1.03] hover:shadow-xl"
@@ -103,41 +95,31 @@ export function ChatLauncher() {
         )}
       </button>
 
-      {isOpen && !isMobile && (
-        <div 
-          className="fixed left-[76px] bottom-5 z-[999] bg-background border border-border rounded-full px-3 py-1.5 shadow-md animate-in fade-in slide-in-from-left-2 duration-200"
-          data-testid="chat-label"
-        >
-          <span className="text-sm font-medium text-foreground">PM 비서</span>
-        </div>
-      )}
-
-      <Sheet open={isOpen} onOpenChange={setIsOpen}>
-        <SheetContent
-          side={isMobile ? "bottom" : "right"}
-          className={`flex flex-col p-0 ${
-            isMobile ? "h-[85vh] rounded-t-xl" : "w-full max-w-[400px]"
-          }`}
-          overlayClassName="bg-black/20"
+      {isOpen && (
+        <Card 
+          className="fixed left-5 bottom-[76px] z-50 w-[360px] h-[60vh] flex flex-col shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-200"
           data-testid="chat-drawer"
         >
-          {isMobile && (
-            <div className="flex justify-center py-2 flex-shrink-0">
-              <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
-            </div>
-          )}
-
-          <SheetHeader className="p-4 border-b border-border flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                <Bot className="w-5 h-5 text-primary" />
+          <div className="p-4 border-b border-border flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Bot className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground" data-testid="chat-title">PM 비서</h3>
+                  <p className="text-xs text-muted-foreground">프로젝트 도우미</p>
+                </div>
               </div>
-              <div className="text-left">
-                <SheetTitle className="text-sm" data-testid="chat-title">PM 비서</SheetTitle>
-                <SheetDescription className="text-xs">프로젝트 도우미</SheetDescription>
-              </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="p-1.5 rounded-md hover:bg-muted transition-colors"
+                data-testid="button-close-chat"
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
             </div>
-          </SheetHeader>
+          </div>
 
           <div
             ref={scrollContainerRef}
@@ -200,8 +182,8 @@ export function ChatLauncher() {
               </Button>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </Card>
+      )}
     </>
   );
 }
