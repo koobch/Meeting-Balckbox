@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,37 +9,19 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Calendar, Users, Clock, ChevronRight, Search, Mic, Upload, Loader2 } from "lucide-react";
-import { createMeeting } from "@/app/actions/meetings";
+import { createMeeting, getMeetings } from "@/app/actions/meetings";
 
-const meetingsData = [
-  {
-    id: "m1",
-    title: "사용자 인터뷰 결과 공유 미팅",
-    date: "2025-01-29",
-    duration: "47분",
-    participants: ["김연구", "이디자인", "박개발", "최PM"],
-    keyPoints: ["온보딩 복잡성", "협업 기능 부족", "가격 민감도"],
-    status: "완료"
-  },
-  {
-    id: "m2",
-    title: "MVP 스코프 확정 회의",
-    date: "2025-01-27",
-    duration: "62분",
-    participants: ["최PM", "박개발", "이디자인"],
-    keyPoints: ["핵심 기능 정의", "일정 조율", "리소스 배분"],
-    status: "완료"
-  },
-  {
-    id: "m3",
-    title: "기술 스택 검토",
-    date: "2025-01-25",
-    duration: "35분",
-    participants: ["박개발", "최PM"],
-    keyPoints: ["프론트엔드 선택", "백엔드 구조", "DB 설계"],
-    status: "완료"
-  },
-];
+interface MeetingUI {
+  id: string;
+  title: string;
+  date: string;
+  duration: string;
+  participants: string[];
+  keyPoints: string[];
+  status: string;
+}
+
+const PROJECT_ID = "550e8400-e29b-41d4-a716-446655440000";
 
 export default function MeetingsPage() {
   const params = useParams();
@@ -47,6 +29,41 @@ export default function MeetingsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [meetings, setMeetings] = useState<MeetingUI[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds) return "0분";
+    const mins = Math.floor(seconds / 60);
+    return mins > 0 ? `${mins}분` : `${seconds}초`;
+  };
+
+  const fetchMeetings = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const result = await getMeetings(PROJECT_ID);
+      if (result.success && result.data) {
+        const formatted: MeetingUI[] = result.data.map((m: any) => ({
+          id: m.id,
+          title: m.title,
+          date: m.meeting_date ? new Date(m.meeting_date).toLocaleDateString('ko-KR') : "-",
+          duration: formatDuration(m.audio_duration_seconds),
+          participants: m.participants || [],
+          keyPoints: m.topics || [],
+          status: m.status || "완료"
+        }));
+        setMeetings(formatted);
+      }
+    } catch (error) {
+      console.error("Failed to fetch meetings:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMeetings();
+  }, [fetchMeetings]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -62,14 +79,14 @@ export default function MeetingsPage() {
       const text = await file.text();
       const result = await createMeeting({
         title: `Imported Transcript`,
-        projectId: "550e8400-e29b-41d4-a716-446655440000",
+        projectId: PROJECT_ID,
         transcript: text,
         participants: []
       });
 
       if (result.success) {
         alert("Transcript uploaded successfully!");
-        router.refresh(); // Refresh the list
+        fetchMeetings(); // Refresh list
       } else {
         throw new Error(result.error);
       }
@@ -82,12 +99,12 @@ export default function MeetingsPage() {
   };
 
   const filteredMeetings = useMemo(() => {
-    if (!searchQuery.trim()) return meetingsData;
+    if (!searchQuery.trim()) return meetings;
     const query = searchQuery.toLowerCase();
-    return meetingsData.filter((meeting) =>
+    return meetings.filter((meeting) =>
       meeting.title.toLowerCase().includes(query)
     );
-  }, [searchQuery]);
+  }, [searchQuery, meetings]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -138,8 +155,13 @@ export default function MeetingsPage() {
       </header>
 
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="space-y-3 max-h-full">
-          {filteredMeetings.length === 0 ? (
+        <div className="space-y-6 max-h-full">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p>회의 목록을 불러오는 중입니다...</p>
+            </div>
+          ) : filteredMeetings.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <p>"{searchQuery}"에 대한 검색 결과가 없습니다.</p>
             </div>
@@ -150,46 +172,36 @@ export default function MeetingsPage() {
                 href={`/projects/${params.projectId}/meetings/${meeting.id}`}
               >
                 <Card
-                  className="hover-elevate cursor-pointer"
+                  className="hover-elevate cursor-pointer border-border/50 shadow-sm"
                   data-testid={`meeting-card-${meeting.id}`}
                 >
-                  <CardContent className="p-4">
+                  <CardContent className="p-5">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-medium text-foreground">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="font-semibold text-foreground text-lg truncate">
                             {meeting.title}
                           </h3>
-                          <Badge variant="secondary" className="text-xs">
+                          <Badge variant="secondary" className="text-xs bg-secondary/50 font-medium">
                             {meeting.status}
                           </Badge>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3.5 h-3.5" />
+                        <div className="flex items-center gap-5 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1.5">
+                            <Calendar className="w-4 h-4" />
                             {meeting.date}
                           </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5" />
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="w-4 h-4" />
                             {meeting.duration}
                           </span>
-                          <span className="flex items-center gap-1">
-                            <Users className="w-3.5 h-3.5" />
+                          <span className="flex items-center gap-1.5">
+                            <Users className="w-4 h-4" />
                             {meeting.participants.length}명
                           </span>
                         </div>
-                        <div className="flex flex-wrap gap-1">
-                          {meeting.keyPoints.map((point) => (
-                            <span
-                              key={point}
-                              className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
-                            >
-                              {point}
-                            </span>
-                          ))}
-                        </div>
                       </div>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                      <ChevronRight className="w-5 h-5 text-muted-foreground/50 flex-shrink-0 mt-1" />
                     </div>
                   </CardContent>
                 </Card>
