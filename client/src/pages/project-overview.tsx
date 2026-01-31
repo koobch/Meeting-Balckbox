@@ -620,7 +620,7 @@ function LiveBriefCard() {
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <Target className="w-5 h-5 text-white" />
           </div>
-          Live Brief
+          라이브 요약
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -655,7 +655,7 @@ function ActionItemsCard() {
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
           <CheckSquare className="w-4 h-4 text-emerald-600" />
-          Action Items
+          다음 할 일
           <Badge variant="secondary" className="ml-auto text-xs">
             {items.filter(i => i.completed).length}/{items.length}
           </Badge>

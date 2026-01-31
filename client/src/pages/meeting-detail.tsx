@@ -806,7 +806,7 @@ export default function MeetingDetail() {
               <CardHeader className="py-3 px-4 border-b border-border">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Lightbulb className="w-4 h-4 text-amber-500" />
-                  Decisions
+                  의사 결정 사항
                   <Badge variant="secondary" className="ml-auto text-xs">
                     {decisionSummariesState.length}
                   </Badge>
@@ -980,7 +980,7 @@ export default function MeetingDetail() {
               <CardHeader className="py-3 px-4 border-b border-border">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-orange-500" />
-                  Logic Findings
+                  보완 필요 항목
                   <Badge variant="secondary" className="ml-auto text-xs bg-orange-100 text-orange-600">
                     {logicFindings.length}
                   </Badge>
@@ -1085,7 +1085,7 @@ export default function MeetingDetail() {
               <CardHeader className="py-3 px-4 border-b border-border">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Inbox className="w-4 h-4 text-violet-600" />
-                  Evidence Drops
+                  보완 리서치
                   <Badge variant="secondary" className="ml-auto text-xs bg-violet-100 text-violet-600">
                     {filteredEvidenceDrops.length}
                   </Badge>
@@ -1188,7 +1188,7 @@ export default function MeetingDetail() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
                     <MessageSquare className="w-4 h-4 text-primary" />
-                    Transcript
+                    회의록
                   </CardTitle>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">{transcript.length}개 발언</span>
