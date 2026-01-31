@@ -249,12 +249,24 @@ export default function MeetingDetail() {
         };
       }
 
-      // If no pattern matches, treat entire line as text with unknown speaker
+      // Pattern 5: Bullet point format (- text or * text)
+      const bulletMatch = line.match(/^[-*]\s+(.+)$/);
+      if (bulletMatch) {
+        return {
+          id: `t-${idx}`,
+          speaker: "Speaker 1",
+          speakerColor: speakerColors["Speaker 1"] || "bg-blue-500",
+          timestamp: "00:00",
+          text: bulletMatch[1].trim()
+        };
+      }
+
+      // If no pattern matches, treat entire line as text with Speaker 1
       console.log('[Transcript] Failed to parse line:', line.substring(0, 100));
       return {
         id: `t-${idx}`,
-        speaker: "Unknown",
-        speakerColor: "bg-slate-400",
+        speaker: "Speaker 1",
+        speakerColor: speakerColors["Speaker 1"] || "bg-blue-500",
         timestamp: "00:00",
         text: line.trim()
       };
@@ -268,7 +280,7 @@ export default function MeetingDetail() {
     parsed.forEach((line) => {
       const lastMerged = merged[merged.length - 1];
       if (lastMerged && lastMerged.speaker === line.speaker &&
-        (line.speaker === "Unknown" || lastMerged.timestamp === line.timestamp)) {
+        lastMerged.timestamp === line.timestamp) {
         lastMerged.text += ' ' + line.text;
       } else {
         merged.push({ ...line });
@@ -932,45 +944,29 @@ export default function MeetingDetail() {
                 <MessageSquare className="w-4 h-4 text-blue-500" />
                 <h2 className="text-sm font-semibold text-foreground">회의록</h2>
               </div>
-              <div className="flex items-center gap-4">
-                <span className="text-[11px] text-muted-foreground font-medium">{transcript.length}개 발언</span>
-                <button className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors font-medium">
-                  <UserCog className="w-3.5 h-3.5" />
-                  화자 지정
-                </button>
+              <div className="text-xs text-muted-foreground">
+                {meetingData ? '데이터 있음' : '데이터 없음'} |
+                {meetingData?.transcript_with_speakers ? `${meetingData.transcript_with_speakers.length}자` : '트랜스크립션 없음'}
               </div>
             </div>
-            <Card className="flex-1 min-h-0 flex flex-col shadow-sm border-border/50">
-              <ScrollArea className="flex-1">
-                <div className="p-4 space-y-6">
-                  {transcript.map((line) => (
-                    <div
-                      key={line.id}
-                      className={`flex gap-4 group transition-colors ${activeLine === line.id ? "bg-primary/5 -mx-2 px-2 py-2 rounded-lg" : ""}`}
-                      data-testid={`transcript-line-${line.id}`}
-                    >
-                      <div className="flex-shrink-0 pt-1">
-                        <div className={`w-9 h-9 rounded-full ${line.speakerColor} flex items-center justify-center text-white text-xs font-bold shadow-sm`}>
-                          {line.speaker.replace("Speaker ", "").charAt(0)}
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-bold text-foreground/80">{line.speaker}</span>
-                          <span className="text-xs text-muted-foreground/60 font-mono tracking-tighter">{line.timestamp}</span>
-                          {Math.random() > 0.8 && (
-                            <Badge variant="secondary" className="bg-blue-50 text-[10px] text-blue-500 hover:bg-blue-50 py-0 h-4 border-none font-bold">핵심</Badge>
-                          )}
-                        </div>
-                        <p className="text-[13.5px] leading-relaxed text-foreground/80 break-words">{line.text}</p>
-                      </div>
+            <Card className="min-h-[600px] flex flex-col shadow-sm border-border/50">
+              <ScrollArea className="h-[600px]">
+                <div className="p-4 w-full h-full">
+                  {meetingData?.transcript_with_speakers ? (
+                    <div className="w-full">
+                      <pre className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words font-sans m-0 p-0">
+                        {meetingData.transcript_with_speakers}
+                      </pre>
                     </div>
-                  ))}
-                  {transcript.length === 0 && (
+                  ) : (
                     <div className="flex flex-col items-center justify-center py-20">
                       <MessageSquare className="w-12 h-12 text-slate-300 mb-3" />
                       <p className="text-sm text-muted-foreground text-center font-medium mb-1">회의록 데이터가 없습니다</p>
                       <p className="text-xs text-muted-foreground/60 text-center">음성 녹음 후 자동으로 생성됩니다</p>
+                      <div className="mt-4 text-xs text-red-500">
+                        <p>디버그: meetingData = {meetingData ? 'exists' : 'null'}</p>
+                        <p>transcript_with_speakers = {meetingData?.transcript_with_speakers ? 'exists' : 'null'}</p>
+                      </div>
                     </div>
                   )}
                 </div>
