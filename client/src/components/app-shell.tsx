@@ -4,7 +4,7 @@ import {
   LayoutDashboard, 
   MessageSquare, 
   FileText,
-  HelpCircle,
+  MessageCircleQuestion,
   Settings,
   Mic,
   Square,
@@ -20,6 +20,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ChatDrawer } from "./chat-drawer";
 
 interface NavItem {
   href: string;
@@ -39,6 +40,7 @@ export function AppShell({ projectId, children }: AppShellProps) {
   const [recordingTime, setRecordingTime] = useState(0);
   const [showTitleDialog, setShowTitleDialog] = useState(false);
   const [meetingTitle, setMeetingTitle] = useState("");
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const navItems: NavItem[] = [
@@ -92,28 +94,49 @@ export function AppShell({ projectId, children }: AppShellProps) {
   return (
     <div className="min-h-screen flex bg-background">
       <aside 
-        className={`flex-shrink-0 border-r border-border bg-white flex flex-col transition-all duration-300 ${
+        className={`flex-shrink-0 border-r border-border bg-white flex flex-col transition-all duration-300 relative ${
           isCollapsed ? "w-16" : "w-64"
         }`}
         data-testid="sidebar-main"
       >
-        <div className="p-4 border-b border-border flex items-center justify-between">
-          {!isCollapsed && (
-            <Link href={`/projects/${projectId}/overview`}>
-              <div className="flex items-center gap-2" data-testid="logo">
-                <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
+        <div className="p-4 border-b border-border flex items-center justify-between gap-2">
+          {!isCollapsed ? (
+            <>
+              <Link href={`/projects/${projectId}/overview`}>
+                <div className="flex items-center gap-2" data-testid="logo">
+                  <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center flex-shrink-0">
+                    <span className="text-primary-foreground text-sm font-bold">T</span>
+                  </div>
+                  <span className="text-lg font-semibold text-foreground">TRACE PM</span>
+                </div>
+              </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsCollapsed(true)}
+                className="flex-shrink-0 h-8 w-8"
+                data-testid="button-collapse-sidebar"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+            </>
+          ) : (
+            <div className="flex flex-col items-center gap-2 w-full">
+              <Link href={`/projects/${projectId}/overview`}>
+                <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center" data-testid="logo-collapsed">
                   <span className="text-primary-foreground text-sm font-bold">T</span>
                 </div>
-                <span className="text-lg font-semibold text-foreground">TRACE PM</span>
-              </div>
-            </Link>
-          )}
-          {isCollapsed && (
-            <Link href={`/projects/${projectId}/overview`}>
-              <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center mx-auto" data-testid="logo-collapsed">
-                <span className="text-primary-foreground text-sm font-bold">T</span>
-              </div>
-            </Link>
+              </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsCollapsed(false)}
+                className="h-8 w-8"
+                data-testid="button-expand-sidebar"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
           )}
         </div>
 
@@ -141,7 +164,7 @@ export function AppShell({ projectId, children }: AppShellProps) {
           )}
         </div>
 
-        <nav className="flex-1 p-3">
+        <nav className="flex-1 p-3 overflow-auto min-h-0">
           <ul className="space-y-1">
             {navItems.map(item => (
               <NavLink key={item.href} item={item} isCollapsed={isCollapsed} />
@@ -149,50 +172,24 @@ export function AppShell({ projectId, children }: AppShellProps) {
           </ul>
         </nav>
 
-        <div className="p-3 border-t border-border">
-          <ul className="space-y-1">
-            <li>
-              <Link
-                href="/ask"
-                className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors ${
-                  isCollapsed ? "justify-center px-0" : ""
-                }`}
-                data-testid="nav-ask"
-              >
-                <HelpCircle className="w-4 h-4" />
-                {!isCollapsed && "PM 비서에게 질문"}
-              </Link>
-            </li>
-            <li>
-              <button
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors ${
-                  isCollapsed ? "justify-center px-0" : ""
-                }`}
-                data-testid="nav-settings"
-              >
-                <Settings className="w-4 h-4" />
-                {!isCollapsed && "설정"}
-              </button>
-            </li>
-          </ul>
-        </div>
+        <div className={`flex-shrink-0 p-3 space-y-2 border-t border-border bg-white ${isCollapsed ? "px-2" : ""}`}>
+          <Button
+            variant="outline"
+            onClick={() => setIsChatOpen(true)}
+            className={`w-full rounded-full shadow-sm ${isCollapsed ? "px-0" : ""}`}
+            data-testid="button-open-chat"
+          >
+            <MessageCircleQuestion className="w-4 h-4 text-primary" />
+            {!isCollapsed && <span className="ml-2 truncate">PM 비서에게 질문</span>}
+          </Button>
 
-        <div className="p-3 border-t border-border">
           <Button
             variant="ghost"
-            size="sm"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="w-full flex items-center justify-center"
-            data-testid="button-toggle-sidebar"
+            className={`w-full justify-start ${isCollapsed ? "px-0 justify-center" : ""}`}
+            data-testid="nav-settings"
           >
-            {isCollapsed ? (
-              <ChevronRight className="w-4 h-4" />
-            ) : (
-              <>
-                <ChevronLeft className="w-4 h-4" />
-                <span className="ml-2">접기</span>
-              </>
-            )}
+            <Settings className="w-4 h-4" />
+            {!isCollapsed && <span className="ml-2">설정</span>}
           </Button>
         </div>
       </aside>
@@ -200,6 +197,8 @@ export function AppShell({ projectId, children }: AppShellProps) {
       <main className="flex-1 flex flex-col min-w-0">
         {children}
       </main>
+
+      <ChatDrawer isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
 
       <Dialog open={showTitleDialog} onOpenChange={setShowTitleDialog}>
         <DialogContent className="sm:max-w-md">
