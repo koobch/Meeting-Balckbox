@@ -446,6 +446,13 @@ export default function MeetingDetail() {
   const [actionItemsState, setActionItemsState] = useState<ActionItem[]>(actionItemsData);
   const [decisionSummariesState, setDecisionSummariesState] = useState<DecisionSummary[]>(initialDecisionSummaries);
   
+  const [newDecisionText, setNewDecisionText] = useState("");
+  const [newActionText, setNewActionText] = useState("");
+  
+  type ResearchState = "idle" | "loading" | "done" | "error";
+  const [researchState, setResearchState] = useState<ResearchState>("idle");
+  const [loadingDots, setLoadingDots] = useState(0);
+  
   const speakerMappingsKey = `trace-pm-speaker-mappings-${meetingId}`;
   const [speakerMappings, setSpeakerMappings] = useState<Record<string, string>>(() => {
     const stored = localStorage.getItem(speakerMappingsKey);
@@ -529,25 +536,77 @@ export default function MeetingDetail() {
     ));
   };
 
-  const totalSelectedCount = selectedDecisions.size + selectedEvidence.size + selectedActions.size;
+  const addNewDecision = () => {
+    if (newDecisionText.trim()) {
+      const newDecision: DecisionSummary = {
+        id: `d-new-${Date.now()}`,
+        title: newDecisionText.trim(),
+        status: "pending",
+        integrationStatus: "not"
+      };
+      setDecisionSummariesState(prev => [...prev, newDecision]);
+      setNewDecisionText("");
+    }
+  };
+
+  const addNewAction = () => {
+    if (newActionText.trim()) {
+      const newAction: ActionItem = {
+        id: `a-new-${Date.now()}`,
+        task: newActionText.trim(),
+        assignee: "미지정",
+        completed: false
+      };
+      setActionItemsState(prev => [...prev, newAction]);
+      setNewActionText("");
+    }
+  };
+
+  const startResearch = () => {
+    setResearchState("loading");
+    setLoadingDots(0);
+    setTimeout(() => {
+      setResearchState("done");
+    }, 2500);
+  };
+
+  useEffect(() => {
+    if (researchState === "loading") {
+      const interval = setInterval(() => {
+        setLoadingDots(prev => (prev + 1) % 4);
+      }, 400);
+      return () => clearInterval(interval);
+    } else {
+      setLoadingDots(0);
+    }
+  }, [researchState]);
+
+  const decisionsToIntegrate = decisionsSelectMode 
+    ? decisionSummariesState.filter(d => !isItemIntegrated(projectId, d.id)).length 
+    : 0;
+  const actionsToIntegrate = actionsSelectMode 
+    ? actionItemsState.filter(a => !isItemIntegrated(projectId, a.id)).length 
+    : 0;
+  const totalSelectedCount = decisionsToIntegrate + selectedEvidence.size + actionsToIntegrate;
 
   const handleCommitToMemory = () => {
     const items: MemoryItem[] = [];
     const now = new Date().toISOString();
 
-    selectedDecisions.forEach(id => {
-      const decision = decisionSummariesState.find(d => d.id === id);
-      if (decision) {
-        items.push({
-          id: `mem-${id}-${Date.now()}`,
-          type: "decision",
-          title: decision.title,
-          sourceId: id,
-          sourceMeetingId: meetingId,
-          integratedAt: now
-        });
-      }
-    });
+    if (decisionsSelectMode) {
+      decisionSummariesState.forEach(decision => {
+        if (!isItemIntegrated(projectId, decision.id)) {
+          items.push({
+            id: `mem-${decision.id}-${Date.now()}`,
+            type: "decision",
+            title: decision.title,
+            sourceId: decision.id,
+            sourceMeetingId: meetingId,
+            integratedAt: now
+          });
+        }
+      });
+    }
 
     selectedEvidence.forEach(id => {
       const evidence = evidenceDrops.find(e => e.id === id);
@@ -564,19 +623,20 @@ export default function MeetingDetail() {
       }
     });
 
-    selectedActions.forEach(id => {
-      const action = actionItemsState.find(a => a.id === id);
-      if (action) {
-        items.push({
-          id: `mem-${id}-${Date.now()}`,
-          type: "action",
-          title: action.task,
-          sourceId: id,
-          sourceMeetingId: meetingId,
-          integratedAt: now
-        });
-      }
-    });
+    if (actionsSelectMode) {
+      actionItemsState.forEach(action => {
+        if (!isItemIntegrated(projectId, action.id)) {
+          items.push({
+            id: `mem-${action.id}-${Date.now()}`,
+            type: "action",
+            title: action.task,
+            sourceId: action.id,
+            sourceMeetingId: meetingId,
+            integratedAt: now
+          });
+        }
+      });
+    }
 
     if (items.length > 0) {
       addToMemory(projectId, items);
@@ -755,18 +815,14 @@ export default function MeetingDetail() {
                   <ul className="space-y-2">
                     {decisionSummariesState.map(decision => {
                       const itemStatus = getItemStatus(decision.id);
-                      const isSelected = selectedDecisions.has(decision.id);
                       const isAlreadyIntegrated = itemStatus === "integrated";
+                      const isIncludedForIntegration = decisionsSelectMode && !isAlreadyIntegrated;
                       return (
-                        <li key={decision.id} className="flex items-center gap-2 group" data-testid={`decision-${decision.id}`}>
-                          {decisionsSelectMode && (
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => toggleDecisionSelection(decision.id)}
-                              disabled={isAlreadyIntegrated}
-                              data-testid={`decision-checkbox-${decision.id}`}
-                            />
-                          )}
+                        <li 
+                          key={decision.id} 
+                          className={`flex items-center gap-2 group rounded px-1.5 py-0.5 -mx-1.5 transition-colors ${isIncludedForIntegration ? "bg-primary/10" : ""}`}
+                          data-testid={`decision-${decision.id}`}
+                        >
                           <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-foreground" />
                           <span className={`text-sm flex-1 ${isAlreadyIntegrated ? "text-muted-foreground" : "text-foreground"}`}>
                             {decision.title}
@@ -776,9 +832,14 @@ export default function MeetingDetail() {
                               <Check className="w-3 h-3" />
                             </span>
                           )}
+                          {isIncludedForIntegration && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-primary/20 text-primary flex items-center gap-0.5">
+                              <Check className="w-3 h-3" />
+                            </span>
+                          )}
                           <button
                             onClick={() => deleteDecision(decision.id)}
-                            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+                            className="p-1 rounded text-muted-foreground/40 hover-elevate"
                             data-testid={`button-delete-decision-${decision.id}`}
                           >
                             <X className="w-3.5 h-3.5" />
@@ -787,6 +848,25 @@ export default function MeetingDetail() {
                       );
                     })}
                   </ul>
+                  <div className="mt-2 pt-2 border-t border-border">
+                    <input
+                      type="text"
+                      value={newDecisionText}
+                      onChange={(e) => setNewDecisionText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          addNewDecision();
+                        } else if (e.key === "Escape") {
+                          setNewDecisionText("");
+                          (e.target as HTMLInputElement).blur();
+                        }
+                      }}
+                      onBlur={() => addNewDecision()}
+                      placeholder="결정 항목 추가…"
+                      className="w-full text-sm bg-transparent border-none outline-none placeholder:text-muted-foreground/50 py-1"
+                      data-testid="input-new-decision"
+                    />
+                  </div>
                 </CardContent>
               </ScrollArea>
             </Card>
@@ -817,19 +897,14 @@ export default function MeetingDetail() {
                   <ul className="space-y-2">
                     {actionItemsState.map(item => {
                       const itemStatus = getItemStatus(item.id);
-                      const isSelected = selectedActions.has(item.id);
                       const isAlreadyIntegrated = itemStatus === "integrated";
+                      const isIncludedForIntegration = actionsSelectMode && !isAlreadyIntegrated;
                       return (
-                        <li key={item.id} className="flex items-start gap-2 group" data-testid={`action-summary-${item.id}`}>
-                          {actionsSelectMode && (
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => toggleActionSelection(item.id)}
-                              disabled={isAlreadyIntegrated}
-                              className="mt-0.5"
-                              data-testid={`action-integration-checkbox-${item.id}`}
-                            />
-                          )}
+                        <li 
+                          key={item.id} 
+                          className={`flex items-start gap-2 group rounded px-1.5 py-0.5 -mx-1.5 transition-colors ${isIncludedForIntegration ? "bg-primary/10" : ""}`}
+                          data-testid={`action-summary-${item.id}`}
+                        >
                           <Checkbox
                             checked={item.completed}
                             onCheckedChange={() => toggleActionCompletion(item.id)}
@@ -847,9 +922,14 @@ export default function MeetingDetail() {
                               <Check className="w-3 h-3" />
                             </span>
                           )}
+                          {isIncludedForIntegration && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-primary/20 text-primary flex items-center gap-0.5">
+                              <Check className="w-3 h-3" />
+                            </span>
+                          )}
                           <button
                             onClick={() => deleteActionItem(item.id)}
-                            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+                            className="p-1 rounded text-muted-foreground/40 hover-elevate"
                             data-testid={`button-delete-action-${item.id}`}
                           >
                             <X className="w-3.5 h-3.5" />
@@ -858,6 +938,25 @@ export default function MeetingDetail() {
                       );
                     })}
                   </ul>
+                  <div className="mt-2 pt-2 border-t border-border">
+                    <input
+                      type="text"
+                      value={newActionText}
+                      onChange={(e) => setNewActionText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          addNewAction();
+                        } else if (e.key === "Escape") {
+                          setNewActionText("");
+                          (e.target as HTMLInputElement).blur();
+                        }
+                      }}
+                      onBlur={() => addNewAction()}
+                      placeholder="할 일 추가…"
+                      className="w-full text-sm bg-transparent border-none outline-none placeholder:text-muted-foreground/50 py-1"
+                      data-testid="input-new-action"
+                    />
+                  </div>
                 </CardContent>
               </ScrollArea>
             </Card>
@@ -920,51 +1019,89 @@ export default function MeetingDetail() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3">
-                {filteredEvidenceDrops.length > 0 ? (
-                  <ul className="space-y-2">
-                    {filteredEvidenceDrops.map(drop => {
-                      const itemStatus = getItemStatus(drop.id);
-                      const isSelected = selectedEvidence.has(drop.id);
-                      const isAlreadyIntegrated = itemStatus === "integrated";
-                      return (
-                        <li 
-                          key={drop.id} 
-                          className="group p-2 rounded-md hover:bg-muted/50 transition-colors border border-transparent hover:border-border"
-                          data-testid={`evidence-drop-${drop.id}`}
-                        >
-                          <div className="flex items-start gap-2">
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => toggleEvidenceSelection(drop.id)}
-                              disabled={isAlreadyIntegrated}
-                              className="mt-0.5"
-                              data-testid={`evidence-checkbox-${drop.id}`}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <h4 className={`text-sm font-medium group-hover:text-primary transition-colors ${isAlreadyIntegrated ? "text-muted-foreground" : "text-foreground"}`}>
-                                  {drop.title}
-                                </h4>
-                                {isAlreadyIntegrated ? (
-                                  <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 flex items-center gap-0.5 flex-shrink-0">
-                                    <Check className="w-3 h-3" />
-                                  </span>
-                                ) : (
-                                  <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
-                                )}
+                {researchState === "idle" && (
+                  <div className="text-center py-6">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      논리 확인을 위해 관련 내용을 리서치 하시겠습니까?
+                    </p>
+                    <Button 
+                      size="sm" 
+                      onClick={startResearch}
+                      data-testid="button-start-research"
+                    >
+                      실행
+                    </Button>
+                  </div>
+                )}
+                {researchState === "loading" && (
+                  <div className="text-center py-6">
+                    <p className="text-sm text-muted-foreground" data-testid="text-research-loading">
+                      리서치중{".".repeat(loadingDots)}
+                    </p>
+                  </div>
+                )}
+                {researchState === "error" && (
+                  <div className="text-center py-6">
+                    <p className="text-sm text-destructive mb-3">
+                      리서치에 실패했습니다. 다시 시도해주세요.
+                    </p>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={startResearch}
+                      data-testid="button-retry-research"
+                    >
+                      다시 실행
+                    </Button>
+                  </div>
+                )}
+                {researchState === "done" && (
+                  filteredEvidenceDrops.length > 0 ? (
+                    <ul className="space-y-2">
+                      {filteredEvidenceDrops.map(drop => {
+                        const itemStatus = getItemStatus(drop.id);
+                        const isSelected = selectedEvidence.has(drop.id);
+                        const isAlreadyIntegrated = itemStatus === "integrated";
+                        return (
+                          <li 
+                            key={drop.id} 
+                            className="group p-2 rounded-md hover:bg-muted/50 transition-colors border border-transparent hover:border-border"
+                            data-testid={`evidence-drop-${drop.id}`}
+                          >
+                            <div className="flex items-start gap-2">
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleEvidenceSelection(drop.id)}
+                                disabled={isAlreadyIntegrated}
+                                className="mt-0.5"
+                                data-testid={`evidence-checkbox-${drop.id}`}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2">
+                                  <h4 className={`text-sm font-medium group-hover:text-primary transition-colors ${isAlreadyIntegrated ? "text-muted-foreground" : "text-foreground"}`}>
+                                    {drop.title}
+                                  </h4>
+                                  {isAlreadyIntegrated ? (
+                                    <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 flex items-center gap-0.5 flex-shrink-0">
+                                      <Check className="w-3 h-3" />
+                                    </span>
+                                  ) : (
+                                    <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{drop.summary}</p>
+                                <span className="text-xs text-primary mt-1 inline-block">{drop.source}</span>
                               </div>
-                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{drop.summary}</p>
-                              <span className="text-xs text-primary mt-1 inline-block">{drop.source}</span>
                             </div>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : (
-                  <p className="text-xs text-muted-foreground text-center py-4">
-                    선택된 Logic Finding에 대한 추천 자료가 없습니다.
-                  </p>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center py-4">
+                      관련 근거를 찾지 못했습니다.
+                    </p>
+                  )
                 )}
               </CardContent>
             </Card>
