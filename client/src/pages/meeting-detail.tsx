@@ -606,8 +606,8 @@ export default function MeetingDetail() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto px-6 py-4 flex flex-col">
-        <section className="mb-4 flex-shrink-0 space-y-4" data-testid="section-summary">
+      <div className="flex-1 overflow-hidden px-6 py-4 flex flex-col min-h-0">
+        <section className="mb-4 flex-shrink-0 space-y-4 overflow-y-auto" data-testid="section-summary">
           <div className="grid grid-cols-2 gap-4">
             <Card data-testid="summary-decisions">
               <CardHeader className="py-3 px-4 border-b border-border">
@@ -760,9 +760,9 @@ export default function MeetingDetail() {
           </div>
         </section>
 
-        <div className="flex gap-6 flex-1 min-h-0">
-          <main className="flex-1 min-w-0 flex flex-col" ref={scrollRef}>
-            <Card className="flex-1 flex flex-col min-h-[400px]">
+        <div className="flex gap-6 flex-1 min-h-0 items-stretch">
+          <main className="flex-1 min-w-0 flex flex-col h-full" ref={scrollRef}>
+            <Card className="flex-1 flex flex-col h-full" data-testid="card-transcript">
               <CardHeader className="py-3 px-4 border-b border-border flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -787,8 +787,8 @@ export default function MeetingDetail() {
             </Card>
           </main>
 
-          <aside className="w-80 flex-shrink-0 flex flex-col gap-4" data-testid="sidebar-summary">
-            <Card>
+          <aside className="w-80 flex-shrink-0 flex flex-col gap-4 h-full" data-testid="sidebar-summary">
+            <Card className="flex-shrink-0">
               <CardHeader className="py-3 px-4 border-b border-border">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <FileText className="w-4 h-4 text-violet-600" />
@@ -813,7 +813,7 @@ export default function MeetingDetail() {
               </CardContent>
             </Card>
 
-            <Card className="flex-1 flex flex-col min-h-0">
+            <Card className="flex-1 flex flex-col min-h-0" data-testid="card-paragraph-summaries">
               <CardHeader className="py-3 px-4 border-b border-border flex-shrink-0">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <FileText className="w-4 h-4 text-amber-600" />

@@ -369,7 +369,7 @@ function MeetingCard({ meeting }: { meeting: MeetingData }) {
   );
 }
 
-function GapCard({ gap }: { gap: GapData }) {
+function GapItem({ gap }: { gap: GapData }) {
   const priorityConfig = {
     high: { label: "높음", className: "bg-red-50 text-red-700 border-red-200" },
     medium: { label: "보통", className: "bg-amber-50 text-amber-700 border-amber-200" },
@@ -377,51 +377,32 @@ function GapCard({ gap }: { gap: GapData }) {
   };
 
   return (
-    <Card className="hover-elevate cursor-pointer transition-all border-dashed" data-testid={`card-gap-${gap.id}`}>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-md bg-orange-100 flex items-center justify-center flex-shrink-0">
-              <AlertCircle className="w-4 h-4 text-orange-600" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-orange-600 uppercase tracking-wide">Gap</span>
-              <h3 className="text-base font-semibold text-foreground leading-tight">{gap.title}</h3>
-            </div>
+    <div 
+      className="p-3 rounded-md hover:bg-muted/50 transition-colors cursor-pointer border border-border border-dashed" 
+      data-testid={`card-gap-${gap.id}`}
+    >
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded bg-orange-100 flex items-center justify-center flex-shrink-0">
+            <AlertCircle className="w-3.5 h-3.5 text-orange-600" />
           </div>
-          <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
+          <h3 className="text-sm font-medium text-foreground">{gap.title}</h3>
         </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <p className="text-sm text-muted-foreground mb-4">{gap.description}</p>
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          <StatusBadge status={gap.status} />
-          <StrengthBadge strength={gap.strength} />
-          <Badge variant="outline" className={priorityConfig[gap.priority].className}>
-            우선순위: {priorityConfig[gap.priority].label}
+        <Badge variant="outline" className={`text-xs ${priorityConfig[gap.priority].className}`}>
+          {priorityConfig[gap.priority].label}
+        </Badge>
+      </div>
+      <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{gap.description}</p>
+      <div className="flex items-center gap-2">
+        <StrengthBadge strength={gap.strength} />
+        {gap.hasLogicFlag && (
+          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs py-0">
+            <TriangleAlert className="w-3 h-3 mr-1" />
+            논리 검토
           </Badge>
-          {gap.hasLogicFlag && (
-            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-              <TriangleAlert className="w-3 h-3 mr-1" />
-              논리 검토
-            </Badge>
-          )}
-        </div>
-        <MetaInfo evidenceCount={gap.evidenceCount} segmentCount={gap.segmentCount} />
-        {gap.relatedDecisions.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-border">
-            <span className="text-xs text-muted-foreground">연결된 결정:</span>
-            <div className="flex flex-wrap gap-1.5 mt-1">
-              {gap.relatedDecisions.map(dec => (
-                <span key={dec} className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                  {dec}
-                </span>
-              ))}
-            </div>
-          </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -814,151 +795,186 @@ export default function ProjectOverview() {
       </header>
       
       <div className="flex-1 overflow-auto px-6 py-6">
-        <div className="flex gap-6">
-          <main className="flex-1 min-w-0">
-            <FilterSortBar
-              statusFilter={statusFilter}
-              onStatusFilterChange={setStatusFilter}
-              sortType={sortType}
-              onSortChange={setSortType}
-              visibility={visibility}
-              onVisibilityChange={setVisibility}
-            />
+        <div className="grid grid-cols-3 gap-4 mb-6" data-testid="section-top-row">
+          <LiveBriefCard />
+          <ActionItemsCard />
+          <DecisionIntegrityCard 
+            activeFilter={activeFilter} 
+            onFilterChange={setActiveFilter} 
+          />
+        </div>
 
-            {hasActiveFilters && (
-              <div className="mb-4 flex items-center gap-2 flex-wrap" data-testid="filter-indicator">
-                {activeFilter && (
-                  <Badge variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-1">
-                    <span className="text-xs">
-                      {activeFilter === "weak" ? "Weak Evidence" : activeFilter === "logic-flags" ? "Logic Flags" : "Missing Evidence"}
-                    </span>
-                    <button 
-                      onClick={() => setActiveFilter(null)}
-                      className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20"
-                      data-testid="button-clear-sidebar-filter"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </Badge>
-                )}
-                {statusFilter && (
-                  <Badge variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-1">
-                    <span className="text-xs">
-                      {statusFilter === "weak" ? "Weak only" : statusFilter === "flags" ? "Flags only" : "Integrated only"}
-                    </span>
-                    <button 
-                      onClick={() => setStatusFilter(null)}
-                      className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20"
-                      data-testid="button-clear-status-filter"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </Badge>
-                )}
-                <button
-                  onClick={() => { setActiveFilter(null); setStatusFilter(null); }}
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                  data-testid="button-clear-all-filters"
-                >
-                  모두 해제
-                </button>
-              </div>
-            )}
+        <FilterSortBar
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          sortType={sortType}
+          onSortChange={setSortType}
+          visibility={visibility}
+          onVisibilityChange={setVisibility}
+        />
 
-            {!hasResults && hasActiveFilters && (
-              <div className="py-12 text-center" data-testid="empty-filter-result">
-                <p className="text-muted-foreground">해당 필터에 맞는 항목이 없습니다.</p>
+        {hasActiveFilters && (
+          <div className="mb-4 flex items-center gap-2 flex-wrap" data-testid="filter-indicator">
+            {activeFilter && (
+              <Badge variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-1">
+                <span className="text-xs">
+                  {activeFilter === "weak" ? "Weak Evidence" : activeFilter === "logic-flags" ? "Logic Flags" : "Missing Evidence"}
+                </span>
                 <button 
-                  onClick={() => { setActiveFilter(null); setStatusFilter(null); }}
-                  className="mt-2 text-sm text-primary hover:underline"
+                  onClick={() => setActiveFilter(null)}
+                  className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20"
+                  data-testid="button-clear-sidebar-filter"
                 >
-                  필터 해제
+                  <X className="w-3 h-3" />
                 </button>
-              </div>
+              </Badge>
             )}
+            {statusFilter && (
+              <Badge variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-1">
+                <span className="text-xs">
+                  {statusFilter === "weak" ? "Weak only" : statusFilter === "flags" ? "Flags only" : "Integrated only"}
+                </span>
+                <button 
+                  onClick={() => setStatusFilter(null)}
+                  className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20"
+                  data-testid="button-clear-status-filter"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </Badge>
+            )}
+            <button
+              onClick={() => { setActiveFilter(null); setStatusFilter(null); }}
+              className="text-xs text-muted-foreground hover:text-foreground"
+              data-testid="button-clear-all-filters"
+            >
+              모두 해제
+            </button>
+          </div>
+        )}
 
-            {filteredDecisions.length > 0 && (
-              <section className="mb-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center">
-                    <Lightbulb className="w-3.5 h-3.5 text-primary" />
-                  </div>
-                  <h2 className="text-lg font-semibold text-foreground" data-testid="section-decisions-title">
-                    주요 결정사항
-                  </h2>
-                  <Badge variant="secondary" className="ml-auto">{filteredDecisions.length}</Badge>
+        {!hasResults && hasActiveFilters && (
+          <div className="py-12 text-center" data-testid="empty-filter-result">
+            <p className="text-muted-foreground">해당 필터에 맞는 항목이 없습니다.</p>
+            <button 
+              onClick={() => { setActiveFilter(null); setStatusFilter(null); }}
+              className="mt-2 text-sm text-primary hover:underline"
+            >
+              필터 해제
+            </button>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-6 mb-6" data-testid="section-middle-row">
+          {(filteredDecisions.length > 0 || !hasActiveFilters) && (
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center">
+                  <Lightbulb className="w-3.5 h-3.5 text-primary" />
                 </div>
-                <Card className="border border-border">
-                  <div className="max-h-[480px] overflow-y-auto p-4">
+                <h2 className="text-base font-semibold text-foreground" data-testid="section-decisions-title">
+                  주요 결정사항
+                </h2>
+                <Badge variant="secondary" className="ml-auto">{filteredDecisions.length}</Badge>
+              </div>
+              <Card className="border border-border">
+                <div className="max-h-[400px] overflow-y-auto p-4">
+                  {filteredDecisions.length > 0 ? (
                     <div className="space-y-4" data-testid="list-decisions">
-                      {filteredDecisions.slice(0, 3).map(decision => (
+                      {filteredDecisions.map(decision => (
                         <DecisionCard key={decision.id} decision={decision} />
                       ))}
                     </div>
-                    {filteredDecisions.length > 3 && (
-                      <div className="pt-4 border-t border-border mt-4">
-                        <p className="text-sm text-muted-foreground mb-3">추가 결정사항 ({filteredDecisions.length - 3}개)</p>
-                        <div className="space-y-4">
-                          {filteredDecisions.slice(3).map(decision => (
-                            <DecisionCard key={decision.id} decision={decision} />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </section>
-            )}
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-8">결정사항이 없습니다.</p>
+                  )}
+                </div>
+              </Card>
+            </section>
+          )}
 
-            {filteredMeetings.length > 0 && (
-              <section className="mb-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-6 h-6 rounded bg-violet-100 flex items-center justify-center">
-                    <Calendar className="w-3.5 h-3.5 text-violet-600" />
-                  </div>
-                  <h2 className="text-lg font-semibold text-foreground" data-testid="section-meetings-title">
-                    미팅 기록
-                  </h2>
-                  <Badge variant="secondary" className="ml-auto">{filteredMeetings.length}</Badge>
+          {(filteredMeetings.length > 0 || !hasActiveFilters) && (
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-6 h-6 rounded bg-violet-100 flex items-center justify-center">
+                  <Calendar className="w-3.5 h-3.5 text-violet-600" />
                 </div>
-                <div className="space-y-4" data-testid="list-meetings">
-                  {filteredMeetings.map(meeting => (
-                    <MeetingCard key={meeting.id} meeting={meeting} />
-                  ))}
+                <h2 className="text-base font-semibold text-foreground" data-testid="section-meetings-title">
+                  미팅 기록
+                </h2>
+                <Badge variant="secondary" className="ml-auto">{filteredMeetings.length}</Badge>
+              </div>
+              <Card className="border border-border">
+                <div className="max-h-[400px] overflow-y-auto p-4">
+                  {filteredMeetings.length > 0 ? (
+                    <div className="space-y-4" data-testid="list-meetings">
+                      {filteredMeetings.map(meeting => (
+                        <MeetingCard key={meeting.id} meeting={meeting} />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-8">미팅 기록이 없습니다.</p>
+                  )}
                 </div>
-              </section>
-            )}
-
-            {filteredGaps.length > 0 && (
-              <section>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-6 h-6 rounded bg-orange-100 flex items-center justify-center">
-                    <AlertCircle className="w-3.5 h-3.5 text-orange-600" />
-                  </div>
-                  <h2 className="text-lg font-semibold text-foreground" data-testid="section-gaps-title">
-                    보완 필요 항목
-                  </h2>
-                  <Badge variant="secondary" className="ml-auto">{filteredGaps.length}</Badge>
-                </div>
-                <div className="space-y-4" data-testid="list-gaps">
-                  {filteredGaps.map(gap => (
-                    <GapCard key={gap.id} gap={gap} />
-                  ))}
-                </div>
-              </section>
-            )}
-          </main>
-
-          <aside className="w-80 flex-shrink-0 space-y-4" data-testid="sidebar-right">
-            <LiveBriefCard />
-            <ActionItemsCard />
-            <DecisionIntegrityCard 
-              activeFilter={activeFilter} 
-              onFilterChange={setActiveFilter} 
-            />
-            <EvidenceDropsCard />
-          </aside>
+              </Card>
+            </section>
+          )}
         </div>
+
+        <section data-testid="section-bottom-row">
+          <Card>
+            <CardHeader className="py-3 px-4 border-b border-border">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-orange-600" />
+                보완 필요 항목
+                <Badge variant="secondary" className="ml-2">{filteredGaps.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+                    <AlertCircle className="w-3.5 h-3.5 text-orange-500" />
+                    Gaps
+                  </h3>
+                  {filteredGaps.length > 0 ? (
+                    <div className="space-y-3" data-testid="list-gaps">
+                      {filteredGaps.map(gap => (
+                        <GapItem key={gap.id} gap={gap} />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">보완 필요 항목이 없습니다.</p>
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+                    <Inbox className="w-3.5 h-3.5 text-violet-600" />
+                    Evidence Drops
+                  </h3>
+                  <ul className="space-y-3" data-testid="list-evidence-drops">
+                    {evidenceDrops.map(evidence => (
+                      <li key={evidence.id} className="group p-3 rounded-md hover:bg-muted/50 transition-colors border border-border" data-testid={`evidence-drop-${evidence.id}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="text-sm font-medium text-foreground group-hover:text-primary transition-colors cursor-pointer">
+                            {evidence.title}
+                          </h4>
+                          <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{evidence.summary}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-primary">{evidence.source}</span>
+                          <span className="text-xs text-muted-foreground">•</span>
+                          <span className="text-xs text-muted-foreground">{evidence.addedAt}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
       </div>
     </div>
   );
