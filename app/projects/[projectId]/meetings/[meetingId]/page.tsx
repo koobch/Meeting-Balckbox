@@ -310,6 +310,13 @@ export default function MeetingDetail() {
         setMeetingTitle(meeting.title);
         setTranscript(parseTranscript(meeting.transcript_with_speakers));
 
+        // Save to recent meetings
+        saveRecentMeeting({
+          id: meeting.id,
+          title: meeting.title,
+          projectId: projectId
+        });
+
         // Parse Topics JSON
         let rawTopics = meeting.topics || [];
         if (rawTopics.length === 1 && typeof rawTopics[0] === 'string' && rawTopics[0].startsWith('[')) {
