@@ -4,7 +4,6 @@ import {
   LayoutDashboard, 
   MessageSquare, 
   FileText,
-  MessageCircleQuestion,
   Settings,
   Mic,
   Square,
@@ -20,7 +19,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ChatDrawer } from "./chat-drawer";
 
 interface NavItem {
   href: string;
@@ -40,7 +38,6 @@ export function AppShell({ projectId, children }: AppShellProps) {
   const [recordingTime, setRecordingTime] = useState(0);
   const [showTitleDialog, setShowTitleDialog] = useState(false);
   const [meetingTitle, setMeetingTitle] = useState("");
-  const [isChatOpen, setIsChatOpen] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const navItems: NavItem[] = [
@@ -172,17 +169,7 @@ export function AppShell({ projectId, children }: AppShellProps) {
           </ul>
         </nav>
 
-        <div className={`flex-shrink-0 p-3 space-y-2 border-t border-border bg-white ${isCollapsed ? "px-2" : ""}`}>
-          <Button
-            variant="outline"
-            onClick={() => setIsChatOpen(true)}
-            className={`w-full rounded-full shadow-sm ${isCollapsed ? "px-0" : ""}`}
-            data-testid="button-open-chat"
-          >
-            <MessageCircleQuestion className="w-4 h-4 text-primary" />
-            {!isCollapsed && <span className="ml-2 truncate">PM 비서에게 질문</span>}
-          </Button>
-
+        <div className={`flex-shrink-0 p-3 border-t border-border bg-white ${isCollapsed ? "px-2" : ""}`}>
           <Button
             variant="ghost"
             className={`w-full justify-start ${isCollapsed ? "px-0 justify-center" : ""}`}
@@ -197,8 +184,6 @@ export function AppShell({ projectId, children }: AppShellProps) {
       <main className="flex-1 flex flex-col min-w-0">
         {children}
       </main>
-
-      <ChatDrawer isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
 
       <Dialog open={showTitleDialog} onOpenChange={setShowTitleDialog}>
         <DialogContent className="sm:max-w-md">

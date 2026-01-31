@@ -8,8 +8,8 @@ import ProjectOverview from "@/pages/project-overview";
 import MeetingDetail from "@/pages/meeting-detail";
 import MeetingsPage from "@/pages/meetings";
 import EvidencePage from "@/pages/evidence";
-import AskPage from "@/pages/ask";
 import { ProjectLayout } from "@/pages/project-layout";
+import { ChatLauncher } from "@/components/chat-launcher";
 
 function ProjectRoutes() {
   return (
@@ -34,7 +34,6 @@ function Router() {
       <Route path="/projects/:projectId/*">
         <ProjectRoutes />
       </Route>
-      <Route path="/ask" component={AskPage} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -46,6 +45,7 @@ function App() {
       <TooltipProvider>
         <Toaster />
         <Router />
+        <ChatLauncher />
       </TooltipProvider>
     </QueryClientProvider>
   );
