@@ -69,18 +69,6 @@ export default function MeetingsPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button className="gap-2 bg-blue-600 hover:bg-blue-700 text-white">
-                    <Mic className="w-4 h-4" />
-                    New Recording
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md bg-transparent border-none shadow-none p-0">
-                  <VoiceRecorder />
-                </DialogContent>
-              </Dialog>
-
               <div className="relative w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input

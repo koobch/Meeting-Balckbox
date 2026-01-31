@@ -2,16 +2,26 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { transcribeAudio, transcribeSampleFile } from '@/app/actions/transcribe';
+import { createMeeting } from '@/app/actions/meetings';
 import { AlertCircle, FileAudio, Mic, MicOff, Loader2, Save, Download, Copy } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
-export default function VoiceRecorder() {
+interface VoiceRecorderProps {
+    projectId?: string;
+}
+
+export default function VoiceRecorder({ projectId }: VoiceRecorderProps) {
     const [isRecording, setIsRecording] = useState(false);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
     const [recordingTime, setRecordingTime] = useState(0);
     const [transcription, setTranscription] = useState<string | null>(null);
     const [supabaseAudioUrl, setSupabaseAudioUrl] = useState<string | null>(null);
     const [isTranscribing, setIsTranscribing] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [meetingTitle, setMeetingTitle] = useState("");
+
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -83,7 +93,6 @@ export default function VoiceRecorder() {
                 setTranscription(result.text as string);
                 if (result.audioUrl) {
                     setSupabaseAudioUrl(result.audioUrl as string);
-                    console.log(`%c[DevTools] Supabase Audio URL: ${result.audioUrl}`, "color: #2563eb; font-weight: bold;");
                 }
             }
         } catch (err) {
@@ -91,6 +100,39 @@ export default function VoiceRecorder() {
             alert("Failed to transcribe audio.");
         } finally {
             setIsTranscribing(false);
+        }
+    };
+
+    const handleSave = async () => {
+        if (!projectId || !transcription || !supabaseAudioUrl) {
+            alert("Please ensure transcription is complete and project ID exists.");
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const result = await createMeeting({
+                title: meetingTitle || `Meeting ${new Date().toLocaleString()}`,
+                projectId: projectId,
+                durationSeconds: recordingTime,
+                transcript: transcription,
+                audioUrl: supabaseAudioUrl,
+                participants: [],
+            });
+
+            if (result.success) {
+                alert("Meeting saved successfully!");
+                // Optionally reset or close
+                setAudioUrl(null);
+                setTranscription(null);
+                setMeetingTitle("");
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error: any) {
+            alert("Failed to save meeting: " + error.message);
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -162,10 +204,8 @@ export default function VoiceRecorder() {
                                         if ('error' in result) alert(result.error);
                                         else if ('text' in result) {
                                             setTranscription(result.text as string);
-                                            if (result.audioUrl) {
-                                                setSupabaseAudioUrl(result.audioUrl as string);
-                                                console.log(`%c[DevTools] Supabase Audio URL: ${result.audioUrl}`, "color: #2563eb; font-weight: bold;");
-                                            }
+                                            // Mocking Supabase URL for sample
+                                            setSupabaseAudioUrl(result.audioUrl as string);
                                         }
                                     } catch (err) {
                                         alert("Sample test failed.");
@@ -224,37 +264,32 @@ export default function VoiceRecorder() {
                         </div>
 
                         {transcription && (
-                            <div
-                                data-supabase-url={supabaseAudioUrl || undefined}
-                                className="flex flex-col gap-4 p-5 bg-gradient-to-br from-zinc-50 to-white dark:from-zinc-900/50 dark:to-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-700/50 shadow-inner animate-in zoom-in-95 duration-500 max-h-96 overflow-y-auto"
-                            >
-                                <div className="flex items-center justify-between sticky top-0 bg-inherit py-1">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                        <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">Transcription</span>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => {
-                                                navigator.clipboard.writeText(transcription);
-                                                alert("Copied to clipboard!");
-                                            }}
-                                            className="text-xs flex items-center gap-1.5 text-zinc-600 hover:text-blue-600 font-semibold transition-colors"
+                            <div className="flex flex-col gap-4 p-5 animate-in zoom-in-95 duration-500">
+                                {projectId ? (
+                                    <div className="space-y-3">
+                                        <Input
+                                            placeholder="Enter meeting title..."
+                                            value={meetingTitle}
+                                            onChange={(e) => setMeetingTitle(e.target.value)}
+                                        />
+                                        <Button
+                                            onClick={handleSave}
+                                            disabled={isSaving}
+                                            className="w-full bg-green-600 hover:bg-green-700 text-white"
                                         >
-                                            <Copy className="w-3.5 h-3.5" />
-                                            Copy
-                                        </button>
-                                        <a
-                                            href={`data:text/plain;charset=utf-8,${encodeURIComponent(transcription)}`}
-                                            download="transcription.txt"
-                                            className="text-xs flex items-center gap-1.5 text-zinc-600 hover:text-emerald-600 font-semibold transition-colors"
-                                        >
-                                            <Save className="w-3.5 h-3.5" />
-                                            Save
-                                        </a>
+                                            {isSaving ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                                            Save to Meetings
+                                        </Button>
                                     </div>
-                                </div>
-                                <div className="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed font-medium whitespace-pre-wrap">
+                                ) : (
+                                    <Alert>
+                                        <AlertCircle className="h-4 w-4" />
+                                        <AlertTitle>Project ID Missing</AlertTitle>
+                                        <AlertDescription>Cannot save meeting without a project context.</AlertDescription>
+                                    </Alert>
+                                )}
+
+                                <div className="p-4 bg-muted rounded-lg max-h-60 overflow-y-auto whitespace-pre-wrap text-sm">
                                     {transcription}
                                 </div>
                             </div>

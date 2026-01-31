@@ -3,9 +3,9 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { 
-  LayoutDashboard, 
-  MessageSquare, 
+import {
+  LayoutDashboard,
+  MessageSquare,
   FileText,
   Settings,
   Mic,
@@ -25,6 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -33,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useProject } from "@/lib/project-context";
+import VoiceRecorder from "@/components/VoiceRecorder";
 
 interface NavItem {
   href: string;
@@ -157,10 +159,9 @@ export function AppShell({ projectId, children }: AppShellProps) {
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
-      <aside 
-        className={`flex-shrink-0 h-screen border-r border-border bg-white flex flex-col transition-all duration-300 ${
-          isCollapsed ? "w-16" : "w-64"
-        }`}
+      <aside
+        className={`flex-shrink-0 h-screen border-r border-border bg-white flex flex-col transition-all duration-300 ${isCollapsed ? "w-16" : "w-64"
+          }`}
         data-testid="sidebar-main"
       >
         <div className="flex-shrink-0 p-4 border-b border-border">
@@ -169,7 +170,7 @@ export function AppShell({ projectId, children }: AppShellProps) {
               <div className="flex items-center justify-between gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button 
+                    <button
                       className="flex items-center gap-2 hover:bg-muted rounded-md p-1 -m-1 transition-colors flex-1 min-w-0"
                       data-testid="dropdown-project-selector"
                     >
@@ -195,7 +196,7 @@ export function AppShell({ projectId, children }: AppShellProps) {
                         {project.id === projectId && <Check className="w-4 h-4 text-primary" />}
                       </DropdownMenuItem>
                     ))}
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={() => router.push("/projects")}
                       className="border-t mt-1 pt-2"
                       data-testid="menu-item-all-projects"
@@ -250,27 +251,20 @@ export function AppShell({ projectId, children }: AppShellProps) {
         </div>
 
         <div className={`flex-shrink-0 p-3 ${isCollapsed ? "px-2" : ""}`}>
-          {isRecording ? (
-            <Button
-              onClick={stopRecording}
-              className={`w-full bg-red-500 hover:bg-red-600 text-white ${isCollapsed ? "px-0" : ""}`}
-              data-testid="button-stop-recording"
-            >
-              <Square className="w-4 h-4" />
-              {!isCollapsed && (
-                <span className="ml-2">녹음 중 {formatTime(recordingTime)}</span>
-              )}
-            </Button>
-          ) : (
-            <Button
-              onClick={startRecording}
-              className={`w-full bg-primary hover:bg-primary/90 ${isCollapsed ? "px-0" : ""}`}
-              data-testid="button-start-recording"
-            >
-              <Mic className="w-4 h-4" />
-              {!isCollapsed && <span className="ml-2">녹음하기</span>}
-            </Button>
-          )}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button
+                className={`w-full bg-primary hover:bg-primary/90 ${isCollapsed ? "px-0" : ""}`}
+                data-testid="button-start-recording"
+              >
+                <Mic className="w-4 h-4" />
+                {!isCollapsed && <span className="ml-2">New Recording</span>}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md bg-transparent border-none shadow-none p-0">
+              <VoiceRecorder projectId={projectId} />
+            </DialogContent>
+          </Dialog>
         </div>
 
         <nav className="flex-1 p-3 overflow-auto min-h-0">
@@ -288,11 +282,10 @@ export function AppShell({ projectId, children }: AppShellProps) {
                       <Link
                         key={meeting.id}
                         href={`/projects/${projectId}/meetings/${meeting.id}`}
-                        className={`block px-2 py-1.5 text-xs rounded-md truncate transition-colors ${
-                          meeting.id === currentMeetingId
-                            ? "bg-primary/10 text-primary font-medium"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                        }`}
+                        className={`block px-2 py-1.5 text-xs rounded-md truncate transition-colors ${meeting.id === currentMeetingId
+                          ? "bg-primary/10 text-primary font-medium"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          }`}
                         data-testid={`recent-meeting-${meeting.id}`}
                       >
                         {meeting.title}
@@ -355,11 +348,10 @@ function NavLink({ item, isCollapsed, pathname }: { item: NavItem; isCollapsed: 
     <li>
       <Link
         href={item.href}
-        className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-          active 
-            ? "bg-primary/10 text-primary font-medium" 
-            : "text-muted-foreground hover:bg-muted hover:text-foreground"
-        } ${isCollapsed ? "justify-center px-0" : ""}`}
+        className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${active
+          ? "bg-primary/10 text-primary font-medium"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          } ${isCollapsed ? "justify-center px-0" : ""}`}
         data-testid={`nav-${item.label.toLowerCase()}`}
       >
         <item.icon className="w-4 h-4" />
