@@ -716,7 +716,7 @@ function FilterSortBar({
 }
 
 export default function ProjectOverview() {
-  const params = useParams<{ id: string }>();
+  const params = useParams<{ projectId: string }>();
   const [activeFilter, setActiveFilter] = useState<FilterType>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
   const [sortType, setSortType] = useState<SortType>("recent");
@@ -812,7 +812,7 @@ export default function ProjectOverview() {
             </div>
             <div>
               <h1 className="text-xl font-semibold text-foreground" data-testid="text-project-title">
-                프로젝트 {params.id}
+                프로젝트 {params.projectId}
               </h1>
               <p className="text-sm text-muted-foreground">Overview</p>
             </div>
