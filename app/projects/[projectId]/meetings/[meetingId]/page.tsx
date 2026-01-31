@@ -944,10 +944,11 @@ export default function MeetingDetail() {
                 <MessageSquare className="w-4 h-4 text-blue-500" />
                 <h2 className="text-sm font-semibold text-foreground">회의록</h2>
               </div>
-              <div className="text-xs text-muted-foreground">
-                {meetingData ? '데이터 있음' : '데이터 없음'} |
-                {meetingData?.transcript_with_speakers ? `${meetingData.transcript_with_speakers.length}자` : '트랜스크립션 없음'}
-              </div>
+              {meetingData?.transcript_with_speakers && (
+                <span className="text-xs text-muted-foreground">
+                  {meetingData.transcript_with_speakers.split('\n').filter((line: string) => line.trim()).length}개 발언
+                </span>
+              )}
             </div>
             <Card className="flex flex-col shadow-sm border-border/50">
               <ScrollArea className="h-[600px]">
@@ -993,10 +994,6 @@ export default function MeetingDetail() {
                       <MessageSquare className="w-12 h-12 text-slate-300 mb-3" />
                       <p className="text-sm text-muted-foreground text-center font-medium mb-1">회의록 데이터가 없습니다</p>
                       <p className="text-xs text-muted-foreground/60 text-center">음성 녹음 후 자동으로 생성됩니다</p>
-                      <div className="mt-4 text-xs text-red-500">
-                        <p>디버그: meetingData = {meetingData ? 'exists' : 'null'}</p>
-                        <p>transcript_with_speakers = {meetingData?.transcript_with_speakers ? 'exists' : 'null'}</p>
-                      </div>
                     </div>
                   )}
                 </div>
