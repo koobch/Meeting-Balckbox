@@ -73,6 +73,7 @@ export async function transcribeAudio(formData: FormData) {
         scribeFormData.append('file', file);
         scribeFormData.append('model_id', 'scribe_v2');
         scribeFormData.append('tag_audio_events', 'true');
+        scribeFormData.append('diarize', 'true'); // Explicitly enable diarization
 
         const response = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
             method: 'POST',
@@ -89,8 +90,50 @@ export async function transcribeAudio(formData: FormData) {
 
         const transcriptionData = await response.json();
 
+        // 3. Format transcription with speakers and timestamps
+        // ElevenLabs STT returns words with speaker_id, start, and end
+        const words = transcriptionData.words || [];
+        let formattedTranscription = "";
+
+        if (words.length > 0) {
+            let currentSpeaker = words[0].speaker_id;
+            let startTime = words[0].start;
+            let currentSegmentText = "";
+
+            const formatTimestamp = (sec: number) => {
+                const mins = Math.floor(sec / 60);
+                const secs = Math.floor(sec % 60);
+                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            };
+
+            words.forEach((word: any, index: number) => {
+                // If speaker changed or it's the first word
+                if (word.speaker_id !== currentSpeaker) {
+                    // Commit previous segment
+                    const speakerLabel = currentSpeaker.replace('speaker_', 'Speaker ');
+                    formattedTranscription += `[${formatTimestamp(startTime)}] ${speakerLabel}: ${currentSegmentText.trim()}\n\n`;
+
+                    // Start new segment
+                    currentSpeaker = word.speaker_id;
+                    startTime = word.start;
+                    currentSegmentText = word.text;
+                } else {
+                    // Append to current segment
+                    currentSegmentText += (word.type === 'spacing' ? '' : ' ') + word.text;
+                }
+
+                // Last word handling
+                if (index === words.length - 1) {
+                    const speakerLabel = currentSpeaker.replace('speaker_', 'Speaker ');
+                    formattedTranscription += `[${formatTimestamp(startTime)}] ${speakerLabel}: ${currentSegmentText.trim()}`;
+                }
+            });
+        } else {
+            formattedTranscription = transcriptionData.text || "";
+        }
+
         return {
-            text: transcriptionData.text,
+            text: formattedTranscription,
             audioUrl: publicUrl
         };
 

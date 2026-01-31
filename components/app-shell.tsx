@@ -188,7 +188,7 @@ export function AppShell({ projectId, children }: AppShellProps) {
       // 2. Save to DB
       const saveResult = await createMeeting({
         title: `Meeting ${new Date().toLocaleString('ko-KR')}`,
-        projectId: projectId,
+        projectId: "550e8400-e29b-41d4-a716-446655440000",
         durationSeconds: duration,
         transcript: transcribeResult.text as string,
         audioUrl: transcribeResult.audioUrl as string,
