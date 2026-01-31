@@ -296,3 +296,19 @@ export async function getExternalEvidences(projectId: string) {
         return { success: false, error: error.message };
     }
 }
+
+export async function getProjectById(projectId: string) {
+    try {
+        const { data, error } = await supabase
+            .from('projects')
+            .select('name, description, team_lead, created_at')
+            .eq('id', projectId)
+            .single();
+
+        if (error) throw error;
+        return { success: true, data };
+    } catch (error: any) {
+        console.error('Failed to fetch project details:', error);
+        return { success: false, error: error.message };
+    }
+}

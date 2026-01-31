@@ -34,9 +34,12 @@ import {
   SlidersHorizontal,
   Loader2,
   Check,
-  Database
+  Database,
+  Info,
+  User,
+  Clock
 } from "lucide-react";
-import { getProjectOverview } from "@/app/actions/meetings";
+import { getProjectOverview, getProjectById } from "@/app/actions/meetings";
 
 type Status = "draft" | "integrated";
 type EvidenceStrength = "strong" | "medium" | "weak";
@@ -109,6 +112,13 @@ interface CalendarDay {
     total: number;
     completed: number;
   } | null;
+}
+
+interface ProjectInfo {
+  name: string;
+  description: string;
+  team_lead: string;
+  created_at: string;
 }
 
 // Hardcoded data removed - now handled by state
@@ -486,34 +496,54 @@ function GapItem({ gap, onComplete }: { gap: GapData; onComplete: (id: string) =
   );
 }
 
+// OLD: LiveBriefCard removed as per user request
+/*
 function LiveBriefCard({ meetings }: { meetings: MeetingData[] }) {
-  const latestMeeting = meetings[0];
-  const currentGoal = "MVP 1차 버전 2월 15일까지 출시"; // Still hardcoded for now or from project desc
-  const latestDecision = latestMeeting ? latestMeeting.keyPoints[0] || "데이터 분석 중" : "데이터 없음";
-  const weeklyRisk = "일정 및 리소스 확인 필요";
+  ...
+}
+*/
+
+function ProjectInfoCard({ projectInfo }: { projectInfo: ProjectInfo | null }) {
+  if (!projectInfo) return null;
 
   return (
-    <Card className="border-2 border-primary/20 bg-primary/5" data-testid="card-live-brief">
+    <Card className="border-2 border-primary/20 bg-primary/5" data-testid="card-project-info">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-bold flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <Target className="w-5 h-5 text-white" />
+            <Info className="w-5 h-5 text-white" />
           </div>
-          라이브 요약
+          프로젝트 정보
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <p className="text-sm text-muted-foreground mb-1">현재 목표</p>
-          <p className="text-lg font-semibold text-foreground">{currentGoal}</p>
+          <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1.5">
+            <Database className="w-3.5 h-3.5" /> 프로젝트명
+          </p>
+          <p className="text-lg font-semibold text-foreground">{projectInfo.name}</p>
         </div>
         <div>
-          <p className="text-sm text-muted-foreground mb-1">최근 미팅 주요 내용</p>
-          <p className="text-base text-foreground">{latestDecision}</p>
+          <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1.5">
+            <FileText className="w-3.5 h-3.5" /> 프로젝트 설명
+          </p>
+          <p className="text-sm text-foreground line-clamp-3">{projectInfo.description || "설명이 없습니다."}</p>
         </div>
-        <div>
-          <p className="text-sm text-muted-foreground mb-1">상태</p>
-          <p className="text-base font-medium text-blue-600">{latestMeeting ? '기록 있음' : '기록 없음'}</p>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5" /> 팀 리드
+            </p>
+            <p className="text-sm font-medium text-foreground">{projectInfo.team_lead || "미지정"}</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5" /> 등록일
+            </p>
+            <p className="text-sm font-medium text-foreground">
+              {projectInfo.created_at ? new Date(projectInfo.created_at).toLocaleDateString('ko-KR') : "-"}
+            </p>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -813,6 +843,7 @@ export default function ProjectOverview() {
   const [gapsData, setGapsData] = useState<GapData[]>([]);
   const [actionItemsState, setActionItemsState] = useState<ActionItem[]>([]);
   const [meetingsCalendarData, setMeetingsCalendarData] = useState<any>({});
+  const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null);
 
   useEffect(() => {
     async function fetchOverview() {
@@ -884,6 +915,12 @@ export default function ProjectOverview() {
             }
           });
           setMeetingsCalendarData(cal);
+
+          // 5. Fetch project master data
+          const projectResult = await getProjectById(projectId);
+          if (projectResult.success && projectResult.data) {
+            setProjectInfo(projectResult.data as ProjectInfo);
+          }
         }
       } catch (error) {
         console.error("Failed to load overview:", error);
@@ -935,7 +972,7 @@ export default function ProjectOverview() {
         ) : (
           <div className="space-y-6" data-testid="section-top-row">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <LiveBriefCard meetings={meetingsState} />
+              <ProjectInfoCard projectInfo={projectInfo} />
               <ActionItemsCard actionItems={actionItemsState} />
             </div>
 
