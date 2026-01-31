@@ -938,7 +938,7 @@ export default function MeetingDetail() {
         {/* 하단: 회의록 | 주제 & 요약 (7:5) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0 flex-1">
           {/* 회의록 (좌측 - 7개 컬럼) */}
-          <section className="lg:col-span-7 flex flex-col min-h-0">
+          <section className="lg:col-span-7 flex flex-col min-h-0 mb-24">
             <div className="flex items-center justify-between mb-2 px-1">
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-blue-500" />
@@ -949,7 +949,7 @@ export default function MeetingDetail() {
                 {meetingData?.transcript_with_speakers ? `${meetingData.transcript_with_speakers.length}자` : '트랜스크립션 없음'}
               </div>
             </div>
-            <Card className="min-h-[600px] flex flex-col shadow-sm border-border/50">
+            <Card className="flex flex-col shadow-sm border-border/50">
               <ScrollArea className="h-[600px]">
                 <div className="p-4 w-full h-full">
                   {meetingData?.transcript_with_speakers ? (
@@ -1002,13 +1002,13 @@ export default function MeetingDetail() {
             </section>
 
             {/* 단락별 요약 */}
-            <section className="flex flex-col flex-1 min-h-0">
+            <section className="flex flex-col flex-1 min-h-0 mb-24">
               <div className="flex items-center gap-2 mb-2 px-1">
                 <FileText className="w-4 h-4 text-orange-500" />
                 <h2 className="text-sm font-semibold text-foreground">단락별 요약</h2>
               </div>
-              <Card className="flex-1 min-h-0 flex flex-col shadow-sm border-border/50">
-                <ScrollArea className="flex-1">
+              <Card className="flex flex-col shadow-sm border-border/50">
+                <ScrollArea className="h-[600px]">
                   <div className="p-4 space-y-6">
                     {paragraphSummaries.map((ps, idx) => (
                       <div key={ps.id} className={`${idx !== paragraphSummaries.length - 1 ? 'border-b border-border/30 pb-6' : ''}`}>
