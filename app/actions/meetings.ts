@@ -133,10 +133,10 @@ export async function getMeetingDetails(meetingId: string) {
 
         if (actionItemsError) throw actionItemsError;
 
-        // 4. Fetch logic gaps
+        // 4. Fetch logic gaps with research results
         const { data: logicGaps, error: logicGapsError } = await supabase
             .from('logic_gaps')
-            .select('*')
+            .select('*, research_results(*)')
             .eq('meeting_id', meetingId)
             .order('created_at', { ascending: true });
 

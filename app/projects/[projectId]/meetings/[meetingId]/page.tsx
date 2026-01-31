@@ -37,11 +37,12 @@ import {
   Inbox,
   ExternalLink,
   Circle,
-  CircleDot,
-  Database,
   Settings,
   Calendar,
-  Loader2
+  Loader2,
+  ShieldCheck,
+  Search,
+  Link2
 } from "lucide-react";
 import { getMeetingDetails, updateLogicGapStatus, updateActionItemStatus, integrateMeetingItems } from "@/app/actions/meetings";
 
@@ -103,6 +104,21 @@ interface LogicFinding {
   relatedLineIds: string[];
 }
 
+interface ResearchSource {
+  source_url: string;
+  key_finding: string;
+  publication_date: string;
+}
+
+interface ResearchResult {
+  summary: string;
+  confidence: string;
+  sources: {
+    supporting: ResearchSource[];
+    opposing: ResearchSource[];
+  };
+}
+
 interface LogicGap {
   id: string;
   speaker: string | null;
@@ -114,6 +130,7 @@ interface LogicGap {
   context: string | null;
   researchType: string | null;
   reviewStatus: string | null;
+  researchResult?: ResearchResult;
 }
 
 
@@ -359,6 +376,7 @@ export default function MeetingDetail() {
 
         // Fetch Logic Gaps
         if (result.data.logicGaps) {
+          console.log('[LogicGaps] Raw data:', result.data.logicGaps);
           setLogicGapsState(result.data.logicGaps.map((lg: any) => ({
             id: lg.id,
             speaker: lg.speaker,
@@ -369,7 +387,14 @@ export default function MeetingDetail() {
             suggestedEvidence: lg.suggested_evidence || lg.suggestedEvidence,
             context: lg.context,
             researchType: lg.research_type || lg.researchType,
-            reviewStatus: lg.review_status || lg.reviewStatus
+            reviewStatus: lg.review_status || lg.reviewStatus,
+            researchResult: (lg.research_results && Array.isArray(lg.research_results) && lg.research_results.length > 0) ? {
+              summary: lg.research_results[0].summary,
+              confidence: lg.research_results[0].confidence,
+              sources: (lg.research_results[0].sources && !Array.isArray(lg.research_results[0].sources))
+                ? lg.research_results[0].sources
+                : { supporting: Array.isArray(lg.research_results[0].sources) ? lg.research_results[0].sources : [], opposing: [] }
+            } : undefined
           })));
         }
 
@@ -951,6 +976,114 @@ export default function MeetingDetail() {
                       <div className="mb-6 pl-1">
                         <p className="text-xs font-semibold text-muted-foreground mb-1">제안된 근거:</p>
                         <p className="text-sm text-foreground/80 whitespace-pre-wrap break-words">{currentLogicGap.suggestedEvidence}</p>
+                      </div>
+                    )}
+
+                    {/* Research Results Section */}
+                    {currentLogicGap?.researchResult && (
+                      <div className="mt-8 border-t border-border/50 pt-8">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center">
+                              <Search className="w-3.5 h-3.5 text-violet-600" />
+                            </div>
+                            <h3 className="text-sm font-bold text-foreground">AI Research Analysis</h3>
+                          </div>
+                          <Badge variant="secondary" className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${currentLogicGap.researchResult.confidence === 'Supported'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-slate-50 text-slate-600 border-slate-200'
+                            }`}>
+                            <ShieldCheck className="w-2.5 h-2.5 mr-1" />
+                            {currentLogicGap.researchResult.confidence}
+                          </Badge>
+                        </div>
+
+                        <div className="bg-slate-50/50 rounded-xl p-5 border border-slate-100 mb-6">
+                          <p className="text-[13.5px] leading-relaxed text-foreground/80 font-medium">
+                            {currentLogicGap.researchResult.summary}
+                          </p>
+                        </div>
+
+                        {/* Research Evidence Grid (Supporting & Opposing Side-by-Side) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Supporting Column */}
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 px-1">
+                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                              <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Supporting Evidence (찬성)</p>
+                            </div>
+                            {currentLogicGap.researchResult.sources.supporting?.[0] ? (
+                              <div className="group p-4 rounded-xl border border-emerald-100 bg-emerald-50/20 hover:border-emerald-200 hover:bg-emerald-50/40 hover:shadow-sm transition-all flex flex-col gap-3 min-h-[140px]">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <Link2 className="w-3 h-3 text-emerald-600/60 shrink-0" />
+                                    <a
+                                      href={currentLogicGap.researchResult.sources.supporting[0].source_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-[11px] text-emerald-700/70 hover:text-emerald-700 hover:underline truncate"
+                                    >
+                                      {(() => {
+                                        try {
+                                          return new URL(currentLogicGap.researchResult.sources.supporting[0].source_url).hostname;
+                                        } catch (e) {
+                                          return "Source Link";
+                                        }
+                                      })()}
+                                    </a>
+                                  </div>
+                                  <span className="text-[10px] text-emerald-600/60 shrink-0">{currentLogicGap.researchResult.sources.supporting[0].publication_date}</span>
+                                </div>
+                                <p className="text-[12.5px] leading-relaxed text-slate-700 group-hover:text-slate-900 transition-colors line-clamp-4">
+                                  {currentLogicGap.researchResult.sources.supporting[0].key_finding}
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="p-4 rounded-xl border border-dashed border-slate-200 flex items-center justify-center min-h-[140px]">
+                                <p className="text-xs text-muted-foreground italic">찬성 근거 데이터 없음</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Opposing Column */}
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 px-1">
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                              <p className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Opposing Concerns (반대)</p>
+                            </div>
+                            {currentLogicGap.researchResult.sources.opposing?.[0] ? (
+                              <div className="group p-4 rounded-xl border border-slate-200 bg-white hover:border-amber-200 hover:shadow-sm transition-all flex flex-col gap-3 min-h-[140px]">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <Link2 className="w-3 h-3 text-slate-400 shrink-0" />
+                                    <a
+                                      href={currentLogicGap.researchResult.sources.opposing[0].source_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-[11px] text-slate-500 hover:text-slate-700 hover:underline truncate"
+                                    >
+                                      {(() => {
+                                        try {
+                                          return new URL(currentLogicGap.researchResult.sources.opposing[0].source_url).hostname;
+                                        } catch (e) {
+                                          return "Source Link";
+                                        }
+                                      })()}
+                                    </a>
+                                  </div>
+                                  <span className="text-[10px] text-muted-foreground shrink-0">{currentLogicGap.researchResult.sources.opposing[0].publication_date}</span>
+                                </div>
+                                <p className="text-[12.5px] leading-relaxed text-slate-600 group-hover:text-slate-800 transition-colors line-clamp-4">
+                                  {currentLogicGap.researchResult.sources.opposing[0].key_finding}
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="p-4 rounded-xl border border-dashed border-slate-200 flex items-center justify-center min-h-[140px]">
+                                <p className="text-xs text-muted-foreground italic">반대 의견 데이터 없음</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
