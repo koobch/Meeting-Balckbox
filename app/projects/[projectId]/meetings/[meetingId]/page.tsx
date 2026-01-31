@@ -817,7 +817,7 @@ export default function MeetingDetail() {
           <div className="flex items-center justify-between mb-2 px-1">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-orange-500" />
-              <h2 className="text-sm font-semibold text-foreground">보완 필요 항목</h2>
+              <h2 className="text-sm font-semibold text-foreground">논리 검토 포인트</h2>
             </div>
             <Badge variant="secondary" className="bg-orange-50 text-orange-600 hover:bg-orange-50 border-none px-2 h-5">
               {logicGapsState.length}
@@ -854,12 +854,14 @@ export default function MeetingDetail() {
 
                 <div className="p-8 flex flex-col items-center">
                   <div className="max-w-4xl w-full">
-                    <div className="flex items-center gap-3 mb-4">
-                      <Badge variant="outline" className="bg-orange-50/50 border-orange-200 text-orange-600 px-3 py-1 font-medium flex items-center gap-1.5 h-auto rounded-md shadow-sm">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        {currentLogicGap?.statement || "내용 없음"}
-                      </Badge>
-                      <div className="ml-auto flex items-center gap-2">
+                    <div className="flex flex-col gap-3 mb-4">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="outline" className="bg-orange-50/50 border-orange-200 text-orange-600 px-3 py-1.5 font-medium flex items-start gap-1.5 h-auto rounded-md shadow-sm max-w-full">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          <span className="break-words whitespace-pre-wrap leading-relaxed">{currentLogicGap?.statement || "내용 없음"}</span>
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
                         {currentLogicGap?.issueType && (
                           <Badge variant="secondary" className="bg-slate-100 text-slate-500 text-[10px] font-medium h-6 px-3 border-none">
                             {currentLogicGap.issueType}
@@ -881,61 +883,16 @@ export default function MeetingDetail() {
                       </div>
                     </div>
 
-                    <p className="text-sm text-foreground/70 mb-6 pl-1 italic">
+                    <p className="text-sm text-foreground/70 mb-6 pl-1 italic whitespace-pre-wrap break-words">
                       {currentLogicGap?.reason || "이유가 명시되지 않았습니다."}
                     </p>
 
                     {currentLogicGap?.suggestedEvidence && (
                       <div className="mb-6 pl-1">
                         <p className="text-xs font-semibold text-muted-foreground mb-1">제안된 근거:</p>
-                        <p className="text-sm text-foreground/80">{currentLogicGap.suggestedEvidence}</p>
+                        <p className="text-sm text-foreground/80 whitespace-pre-wrap break-words">{currentLogicGap.suggestedEvidence}</p>
                       </div>
                     )}
-
-                    <div className="flex items-center gap-4 border-t border-border/40 pt-6">
-                      {currentLogicGap?.speaker && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewRelatedStatement(currentLogicGap.speaker)}
-                          className="h-8 gap-1.5 text-xs text-muted-foreground hover:bg-slate-50 border-border/60 rounded-md"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5" />
-                          {currentLogicGap.speaker} 발언
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewRelatedStatement(currentLogicGap?.speaker || null)}
-                        className="h-8 text-xs text-muted-foreground hover:bg-slate-50 border-border/60 rounded-md px-4"
-                      >
-                        발언 보기
-                      </Button>
-
-                      <div className="flex-1 flex justify-center">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRunResearch(currentLogicGap?.id || '')}
-                          className="h-8 gap-2 text-[11px] text-violet-600 hover:bg-violet-50 hover:text-violet-700 font-medium"
-                        >
-                          <Play className="w-3 h-3" />
-                          리서치 실행
-                        </Button>
-                      </div>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleMarkAsResolved(currentLogicGap?.id || '')}
-                        disabled={currentLogicGap?.reviewStatus === 'resolved'}
-                        className="h-8 gap-1.5 text-xs text-muted-foreground hover:bg-slate-50 border-border/60 rounded-md px-3 disabled:opacity-50"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        {currentLogicGap?.reviewStatus === 'resolved' ? '보완 완료됨' : '보완 완료'}
-                      </Button>
-                    </div>
                   </div>
 
                   {/* Pagination Dots */}
