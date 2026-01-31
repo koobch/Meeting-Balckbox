@@ -103,3 +103,46 @@ export async function getMeetings(projectId: string) {
         return { success: false, error: error.message };
     }
 }
+
+export async function getMeetingDetails(meetingId: string) {
+    try {
+        // 1. Fetch meeting
+        const { data: meeting, error: meetingError } = await supabase
+            .from('meetings')
+            .select('*')
+            .eq('id', meetingId)
+            .single();
+
+        if (meetingError) throw meetingError;
+
+        // 2. Fetch decisions
+        const { data: decisions, error: decisionsError } = await supabase
+            .from('decisions')
+            .select('*')
+            .eq('meeting_id', meetingId)
+            .order('created_at', { ascending: true });
+
+        if (decisionsError) throw decisionsError;
+
+        // 3. Fetch action items
+        const { data: actionItems, error: actionItemsError } = await supabase
+            .from('action_items')
+            .select('*')
+            .eq('meeting_id', meetingId)
+            .order('created_at', { ascending: true });
+
+        if (actionItemsError) throw actionItemsError;
+
+        return {
+            success: true,
+            data: {
+                meeting,
+                decisions,
+                actionItems
+            }
+        };
+    } catch (error: any) {
+        console.error('Failed to fetch meeting details:', error);
+        return { success: false, error: error.message };
+    }
+}

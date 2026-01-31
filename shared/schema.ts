@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, bigint, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, bigint, uuid, boolean, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -16,7 +16,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
 
 export const meetings = pgTable("meetings", {
   id: uuid("id").primaryKey().defaultRandom(),
-  projectId: uuid("project_id"), // SQL: project_id uuid null
+  projectId: uuid("project_id"),
   title: varchar("title", { length: 255 }).notNull(),
   meetingDate: timestamp("meeting_date", { withTimezone: true }),
   participants: text("participants").array(),
@@ -32,9 +32,34 @@ export const meetings = pgTable("meetings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
-export const insertMeetingSchema = createInsertSchema(meetings);
+export const actionItems = pgTable("action_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  meetingId: uuid("meeting_id").references(() => meetings.id, { onDelete: 'cascade' }),
+  assignee: varchar("assignee", { length: 100 }),
+  task: text("task").notNull(),
+  dueDate: date("due_date"),
+  priority: varchar("priority", { length: 10 }),
+  status: varchar("status", { length: 20 }).default("pending"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
+export const decisions = pgTable("decisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  meetingId: uuid("meeting_id").notNull().references(() => meetings.id, { onDelete: 'cascade' }),
+  content: text("content").notNull(),
+  reasoning: text("reasoning"),
+  isIntegrated: boolean("is_integrated").notNull().default(false),
+  integratedAt: timestamp("integrated_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+export const insertMeetingSchema = createInsertSchema(meetings);
+export const insertActionItemSchema = createInsertSchema(actionItems);
+export const insertDecisionSchema = createInsertSchema(decisions);
+
 export type User = typeof users.$inferSelect;
-export type InsertMeeting = z.infer<typeof insertMeetingSchema>;
 export type Meeting = typeof meetings.$inferSelect;
+export type ActionItem = typeof actionItems.$inferSelect;
+export type Decision = typeof decisions.$inferSelect;
