@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "wouter";
+import { saveRecentMeeting } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -490,6 +491,16 @@ export default function MeetingDetail() {
   const handleDefer = () => {
     setShowMergeTray(false);
   };
+
+  useEffect(() => {
+    if (params.projectId && params.meetingId) {
+      saveRecentMeeting({
+        id: params.meetingId,
+        title: meetingTitle,
+        projectId: params.projectId
+      });
+    }
+  }, [params.projectId, params.meetingId]);
 
   useEffect(() => {
     if (isPlaying) {

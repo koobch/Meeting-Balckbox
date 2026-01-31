@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Link, useRoute, useLocation } from "wouter";
 import { 
   LayoutDashboard, 
@@ -11,7 +11,8 @@ import {
   ChevronRight,
   ChevronDown,
   Check,
-  FolderKanban
+  FolderKanban,
+  Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,33 @@ interface Project {
   name: string;
 }
 
+interface RecentMeeting {
+  id: string;
+  title: string;
+  projectId: string;
+  viewedAt: number;
+}
+
+const RECENT_MEETINGS_KEY = "trace-pm-recent-meetings";
+const MAX_RECENT_MEETINGS = 10;
+
+function getRecentMeetings(): RecentMeeting[] {
+  try {
+    const stored = localStorage.getItem(RECENT_MEETINGS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentMeeting(meeting: Omit<RecentMeeting, "viewedAt">): void {
+  const meetings = getRecentMeetings();
+  const filtered = meetings.filter(m => !(m.id === meeting.id && m.projectId === meeting.projectId));
+  const updated = [{ ...meeting, viewedAt: Date.now() }, ...filtered].slice(0, MAX_RECENT_MEETINGS);
+  localStorage.setItem(RECENT_MEETINGS_KEY, JSON.stringify(updated));
+  window.dispatchEvent(new CustomEvent("recent-meetings-updated"));
+}
+
 const projects: Project[] = [
   { id: "1", name: "TRACE PM MVP" },
   { id: "2", name: "모바일 앱 리디자인" },
@@ -51,16 +79,38 @@ interface AppShellProps {
   children: React.ReactNode;
 }
 
+export { saveRecentMeeting };
+
 export function AppShell({ projectId, children }: AppShellProps) {
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [showTitleDialog, setShowTitleDialog] = useState(false);
   const [meetingTitle, setMeetingTitle] = useState("");
+  const [recentMeetings, setRecentMeetings] = useState<RecentMeeting[]>([]);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentProject = projects.find(p => p.id === projectId) || projects[0];
+
+  useEffect(() => {
+    setRecentMeetings(getRecentMeetings());
+    const handleUpdate = () => setRecentMeetings(getRecentMeetings());
+    window.addEventListener("recent-meetings-updated", handleUpdate);
+    return () => window.removeEventListener("recent-meetings-updated", handleUpdate);
+  }, []);
+
+  const currentMeetingMatch = location.match(/\/projects\/(\d+)\/meetings\/([^/]+)/);
+  const currentMeetingId = currentMeetingMatch ? currentMeetingMatch[2] : null;
+
+  const projectRecentMeetings = recentMeetings
+    .filter(m => m.projectId === projectId)
+    .sort((a, b) => {
+      if (a.id === currentMeetingId) return -1;
+      if (b.id === currentMeetingId) return 1;
+      return b.viewedAt - a.viewedAt;
+    })
+    .slice(0, MAX_RECENT_MEETINGS);
 
   const navItems: NavItem[] = [
     { href: `/projects/${projectId}/overview`, label: "Overview", icon: LayoutDashboard },
@@ -235,7 +285,31 @@ export function AppShell({ projectId, children }: AppShellProps) {
         <nav className="flex-1 p-3 overflow-auto min-h-0">
           <ul className="space-y-1">
             {navItems.map(item => (
-              <NavLink key={item.href} item={item} isCollapsed={isCollapsed} />
+              <div key={item.href}>
+                <NavLink item={item} isCollapsed={isCollapsed} />
+                {item.label === "Meetings" && !isCollapsed && projectRecentMeetings.length > 0 && (
+                  <div className="ml-7 mt-1 space-y-0.5" data-testid="recent-meetings-list">
+                    <div className="flex items-center gap-1.5 px-2 py-1">
+                      <Clock className="w-3 h-3 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">최근 조회</span>
+                    </div>
+                    {projectRecentMeetings.map(meeting => (
+                      <Link
+                        key={meeting.id}
+                        href={`/projects/${projectId}/meetings/${meeting.id}`}
+                        className={`block px-2 py-1.5 text-xs rounded-md truncate transition-colors ${
+                          meeting.id === currentMeetingId
+                            ? "bg-primary/10 text-primary font-medium"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        }`}
+                        data-testid={`recent-meeting-${meeting.id}`}
+                      >
+                        {meeting.title}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </ul>
         </nav>
