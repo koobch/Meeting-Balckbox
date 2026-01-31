@@ -800,10 +800,13 @@ export default function ProjectOverview() {
   const projectId = params.projectId as string;
 
   const [isLoading, setIsLoading] = useState(true);
+  // OLD: Filters and sort types removed to simplify overview
+  /*
   const [activeFilter, setActiveFilter] = useState<FilterType>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
   const [sortType, setSortType] = useState<SortType>("recent");
   const [visibility, setVisibility] = useState<CardVisibility>({ decisions: true, meetings: true });
+  */
 
   const [decisionsState, setDecisionsState] = useState<DecisionData[]>([]);
   const [meetingsState, setMeetingsState] = useState<MeetingData[]>([]);
@@ -895,85 +898,16 @@ export default function ProjectOverview() {
     setGapsData(prev => prev.filter(gap => gap.id !== gapId));
   };
 
-  const getPriorityScore = (item: { strength: EvidenceStrength; hasLogicFlag?: boolean; priority?: string }) => {
-    let score = 0;
-    if (item.strength === "weak") score += 3;
-    else if (item.strength === "medium") score += 2;
-    if (item.hasLogicFlag) score += 2;
-    if (item.priority === "high") score += 3;
-    else if (item.priority === "medium") score += 1;
-    return score;
-  };
-
-  const filterAndSortItems = <T extends {
-    strength: EvidenceStrength;
-    evidenceCount: number;
-    hasLogicFlag?: boolean;
-    status: Status;
-    createdAt?: string;
-    date?: string;
-    priority?: string;
-  }>(items: T[]): T[] => {
-    let result = [...items];
-
-    if (activeFilter) {
-      switch (activeFilter) {
-        case "weak":
-          result = result.filter(item => item.strength === "weak");
-          break;
-        case "logic-flags":
-          result = result.filter(item => item.hasLogicFlag);
-          break;
-        case "missing-evidence":
-          result = result.filter(item => item.evidenceCount < 3);
-          break;
-      }
-    }
-
-    if (statusFilter) {
-      switch (statusFilter) {
-        case "weak":
-          result = result.filter(item => item.strength === "weak");
-          break;
-        case "flags":
-          result = result.filter(item => item.hasLogicFlag);
-          break;
-        case "integrated":
-          result = result.filter(item => item.status === "integrated");
-          break;
-      }
-    }
-
-    if (sortType === "recent") {
-      result.sort((a, b) => {
-        const dateA = a.createdAt || a.date || "";
-        const dateB = b.createdAt || b.date || "";
-        return dateB.localeCompare(dateA);
-      });
-    } else {
-      result.sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
-    }
-
-    return result;
-  };
-
-  const filteredDecisions = useMemo(() =>
-    visibility.decisions ? filterAndSortItems(decisionsState) : [],
-    [activeFilter, statusFilter, sortType, visibility.decisions, decisionsState]
-  );
-
-  const filteredMeetings = useMemo(() =>
-    visibility.meetings ? filterAndSortItems(meetingsState) : [],
-    [activeFilter, statusFilter, sortType, visibility.meetings, meetingsState]
-  );
-
-  const filteredGaps = useMemo(() =>
-    filterAndSortItems(gapsData),
-    [activeFilter, statusFilter, sortType, gapsData]
-  );
-
-  const hasResults = filteredDecisions.length > 0 || filteredMeetings.length > 0 || filteredGaps.length > 0;
-  const hasActiveFilters = activeFilter !== null || statusFilter !== null;
+  // OLD: Filter and Sort logic removed for simplified overview
+  /*
+  const getPriorityScore = ...
+  const filterAndSortItems = ...
+  const filteredDecisions = ...
+  const filteredMeetings = ...
+  const filteredGaps = ...
+  const hasResults = ...
+  const hasActiveFilters = ...
+  */
 
   const [projectName, setProjectName] = useProjectName(projectId || "1");
 
@@ -999,88 +933,37 @@ export default function ProjectOverview() {
             <p className="animate-pulse">프로젝트 데이터를 분석하는 중입니다...</p>
           </div>
         ) : (
-          <div className="space-y-4" data-testid="section-top-row">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              <div className="lg:col-span-8 flex flex-col gap-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <LiveBriefCard meetings={meetingsState} />
-                  <ActionItemsCard actionItems={actionItemsState} />
-                </div>
+          <div className="space-y-6" data-testid="section-top-row">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <LiveBriefCard meetings={meetingsState} />
+              <ActionItemsCard actionItems={actionItemsState} />
+            </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <MeetingIntegrationCalendar projectId={projectId || "1"} meetingsData={meetingsCalendarData} />
-                  <Card data-testid="card-gaps" className="flex flex-col">
-                    <CardHeader className="py-3 px-4 border-b border-border">
-                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 text-orange-600" />
-                        보완 필요 항목
-                        <Badge variant="secondary" className="ml-2">{gapsData.length}</Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 flex-1">
-                      {gapsData.length > 0 ? (
-                        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1" data-testid="list-gaps">
-                          {gapsData.map(gap => (
-                            <GapItem key={gap.id} gap={gap} onComplete={handleCompleteGap} />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-                          <Check className="w-10 h-10 text-emerald-500 mb-2 opacity-50" />
-                          <p className="text-sm">현재 보완할 항목이 없습니다.</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Decisions & Meetings Feed */}
-                <div className="space-y-6 pt-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Database className="w-5 h-5 text-primary" />
-                      <h2 className="text-lg font-bold text-foreground">Project Updates</h2>
-                    </div>
-                  </div>
-
-                  <FilterSortBar
-                    statusFilter={statusFilter}
-                    onStatusFilterChange={setStatusFilter}
-                    sortType={sortType}
-                    onSortChange={setSortType}
-                    visibility={visibility}
-                    onVisibilityChange={setVisibility}
-                  />
-
-                  {!hasResults ? (
-                    <div className="flex flex-col items-center justify-center py-32 border-2 border-dashed border-border rounded-xl bg-muted/20">
-                      <Inbox className="w-12 h-12 text-muted-foreground mb-4 opacity-30" />
-                      <p className="text-lg font-medium text-foreground">No updates found</p>
-                      <p className="text-sm text-muted-foreground mt-1">Try changing filters or adding new meetings</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <MeetingIntegrationCalendar projectId={projectId || "1"} meetingsData={meetingsCalendarData} />
+              <Card data-testid="card-gaps" className="flex flex-col h-full">
+                <CardHeader className="py-3 px-4 border-b border-border">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-orange-600" />
+                    보완 필요 항목
+                    <Badge variant="secondary" className="ml-2">{gapsData.length}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 flex-1">
+                  {gapsData.length > 0 ? (
+                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1" data-testid="list-gaps">
+                      {gapsData.map(gap => (
+                        <GapItem key={gap.id} gap={gap} onComplete={handleCompleteGap} />
+                      ))}
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {filteredDecisions.map(decision => (
-                        <DecisionCard key={decision.id} decision={decision} />
-                      ))}
-                      {filteredMeetings.map(meeting => (
-                        <MeetingCard key={meeting.id} meeting={meeting} />
-                      ))}
+                    <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                      <Check className="w-10 h-10 text-emerald-500 mb-2 opacity-50" />
+                      <p className="text-sm">현재 보완할 항목이 없습니다.</p>
                     </div>
                   )}
-                </div>
-              </div>
-
-              <div className="lg:col-span-4 flex flex-col gap-6">
-                <DecisionIntegrityCard
-                  activeFilter={activeFilter}
-                  onFilterChange={setActiveFilter}
-                  gapsData={gapsData}
-                  decisions={decisionsState}
-                  meetings={meetingsState}
-                />
-                <EvidenceDropsCard meetings={meetingsState} />
-              </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         )}
