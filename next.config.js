@@ -1,9 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  allowedDevOrigins: ["*.replit.dev"],
   reactStrictMode: true,
   experimental: {
-    serverComponentsExternalPackages: ['pg'],
+    serverComponentsExternalPackages: ["pg"],
   },
-}
+};
 
-export default nextConfig
+export default nextConfig;
