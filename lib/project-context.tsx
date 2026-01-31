@@ -15,7 +15,7 @@ interface ProjectContextType {
 }
 
 const initialProjects: Project[] = [
-  { id: "1", name: "TRACE PM MVP" },
+  { id: "550e8400-e29b-41d4-a716-446655440000", name: "TRACE PM MVP" },
   { id: "2", name: "모바일 앱 리디자인" },
   { id: "3", name: "B2B 플랫폼 구축" },
 ];
@@ -28,7 +28,7 @@ function loadProjects(): Project[] {
     if (stored) {
       return JSON.parse(stored);
     }
-  } catch {}
+  } catch { }
   return initialProjects;
 }
 
@@ -41,7 +41,7 @@ const ProjectContext = createContext<ProjectContextType | null>(null);
 
 export function ProjectProvider({ children, projectId }: { children: React.ReactNode; projectId?: string }) {
   const [projects, setProjects] = useState<Project[]>(loadProjects);
-  
+
   useEffect(() => {
     const handleUpdate = () => setProjects(loadProjects());
     window.addEventListener("projects-updated", handleUpdate);
@@ -56,7 +56,7 @@ export function ProjectProvider({ children, projectId }: { children: React.React
 
   const updateProjectName = useCallback((projectId: string, newName: string) => {
     setProjects(prev => {
-      const updated = prev.map(p => 
+      const updated = prev.map(p =>
         p.id === projectId ? { ...p, name: newName } : p
       );
       saveProjects(updated);
@@ -86,14 +86,14 @@ export function useProject() {
 export function useProjectName(projectId: string) {
   const { getProject, updateProjectName, projects } = useProject();
   const project = getProject(projectId);
-  
-  const defaultName = projects.find(p => p.id === projectId)?.name || 
-    initialProjects.find(p => p.id === projectId)?.name || 
+
+  const defaultName = projects.find(p => p.id === projectId)?.name ||
+    initialProjects.find(p => p.id === projectId)?.name ||
     "프로젝트";
-  
+
   const setName = useCallback((newName: string) => {
     updateProjectName(projectId, newName);
   }, [projectId, updateProjectName]);
-  
+
   return [project?.name || defaultName, setName] as const;
 }
