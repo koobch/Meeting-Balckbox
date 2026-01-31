@@ -360,7 +360,7 @@ function MeetingIntegrationCalendar({ projectId }: { projectId: string }) {
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Calendar className="w-4 h-4 text-primary" />
-            Meeting Integration Calendar
+            진행 사항 확인 캘린더
           </CardTitle>
           <span className="text-xs text-muted-foreground">2025년 1월</span>
         </div>
@@ -662,7 +662,7 @@ function ActionItemsCard() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <ul className="space-y-2">
+        <ul className="space-y-2 max-h-[200px] overflow-y-auto">
           {items.map(item => (
             <li key={item.id} className="flex items-start gap-2">
               <Checkbox 
