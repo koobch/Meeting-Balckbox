@@ -589,7 +589,7 @@ export default function MeetingDetail() {
 
   return (
     <div className="flex-1 flex flex-col overflow-auto bg-background">
-      <header className="border-b border-border bg-muted/30 sticky top-0 z-10 flex-shrink-0">
+      <header className="border-b border-border bg-background sticky top-0 z-10 flex-shrink-0">
         <div className="px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
