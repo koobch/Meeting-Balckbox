@@ -66,28 +66,43 @@ export default function EvidencePage() {
 
   const loadEvidences = async () => {
     setLoading(true);
+    console.log("[EvidencePage] Loading evidences for projectId:", projectId);
     try {
       const result = await getExternalEvidences(projectId);
+      console.log("[EvidencePage] Fetch result:", result);
+
       if (result.success && result.data) {
         // Map Supabase fields to EvidenceItem interface
-        const mappedData = result.data.map((item: any) => ({
-          id: item.id,
-          title: item.title,
-          summary: item.summary,
-          source: item.source || item.file_extension || '',
-          type: (item.type || 'file') as EvidenceItem['type'],
-          addedAt: item.created_at ? new Date(item.created_at).toISOString().split('T')[0] : '',
-          linkedDecisions: item.linked_decisions || [],
-          fileName: item.file_name || item.title,
-          fileSize: item.file_size || '0 KB'
-        }));
+        const mappedData = result.data.map((item: any) => {
+          // Determine the evidence type based on file_type or other criteria
+          let type: EvidenceItem['type'] = "file";
+          const fileType = item.file_type?.toLowerCase() || "";
+          if (fileType.includes("interview")) type = "interview";
+          else if (fileType.includes("pdf") || fileType.includes("doc")) type = "document";
+
+          return {
+            id: item.id,
+            title: item.title || item.file_name || "제목 없음",
+            summary: item.summary || "",
+            source: item.file_type ? `.${item.file_type}` : '',
+            type: type,
+            addedAt: item.created_at ? new Date(item.created_at).toISOString().split('T')[0] : '',
+            linkedDecisions: item.linked_decisions || [],
+            fileName: item.file_name,
+            fileSize: item.file_size ? formatFileSize(parseInt(item.file_size)) : '0 KB'
+          };
+        });
+
+        console.log("[EvidencePage] Mapped data:", mappedData);
         setEvidenceData(mappedData);
+      } else {
+        console.error("[EvidencePage] Fetch failed:", result.error);
       }
     } catch (error) {
-      console.error("Error loading evidences:", error);
+      console.error("[EvidencePage] Error loading evidences:", error);
       toast({
         title: "데이터 로드 실패",
-        description: "전자료를 불러오는 중 오류가 발생했습니다.",
+        description: "자료를 불러오는 중 오류가 발생했습니다.",
         variant: "destructive"
       });
     } finally {

@@ -273,13 +273,23 @@ export async function getProjectOverview(projectId: string) {
 
 export async function getExternalEvidences(projectId: string) {
     try {
+        console.log(`[getExternalEvidences] Fetching for projectId: ${projectId}`);
         const { data, error } = await supabase
             .from('external_evidences')
             .select('*')
             .eq('project_id', projectId)
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+            console.error('[getExternalEvidences] Supabase error:', error);
+            throw error;
+        }
+
+        console.log(`[getExternalEvidences] Successfully fetched ${data?.length || 0} items`);
+        if (data && data.length > 0) {
+            console.log(`[getExternalEvidences] First item sample:`, JSON.stringify(data[0], null, 2));
+        }
+
         return { success: true, data: data || [] };
     } catch (error: any) {
         console.error('Failed to fetch external evidences:', error);
