@@ -6,7 +6,10 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Calendar, Users, Clock, ChevronRight, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Calendar, Users, Clock, ChevronRight, Search, Mic } from "lucide-react";
+import VoiceRecorder from "@/components/VoiceRecorder";
 
 const meetingsData = [
   {
@@ -35,7 +38,7 @@ const meetingsData = [
     participants: ["박개발", "최PM"],
     keyPoints: ["프론트엔드 선택", "백엔드 구조", "DB 설계"],
     status: "완료"
-  }
+  },
 ];
 
 export default function MeetingsPage() {
@@ -45,7 +48,7 @@ export default function MeetingsPage() {
   const filteredMeetings = useMemo(() => {
     if (!searchQuery.trim()) return meetingsData;
     const query = searchQuery.toLowerCase();
-    return meetingsData.filter(meeting => 
+    return meetingsData.filter((meeting) =>
       meeting.title.toLowerCase().includes(query)
     );
   }, [searchQuery]);
@@ -56,20 +59,38 @@ export default function MeetingsPage() {
         <div className="px-6 py-4">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h1 className="text-xl font-semibold text-foreground" data-testid="text-page-title">
+              <h1
+                className="text-xl font-semibold text-foreground"
+                data-testid="text-page-title"
+              >
                 Meetings
               </h1>
               <p className="text-sm text-muted-foreground">프로젝트 미팅 기록</p>
             </div>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="회의록 검색..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-                data-testid="input-search-meetings"
-              />
+
+            <div className="flex items-center gap-3">
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button className="gap-2 bg-blue-600 hover:bg-blue-700 text-white">
+                    <Mic className="w-4 h-4" />
+                    New Recording
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md bg-transparent border-none shadow-none p-0">
+                  <VoiceRecorder />
+                </DialogContent>
+              </Dialog>
+
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="회의록 검색..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-search-meetings"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -81,52 +102,62 @@ export default function MeetingsPage() {
             <div className="text-center py-8 text-muted-foreground">
               <p>"{searchQuery}"에 대한 검색 결과가 없습니다.</p>
             </div>
-          ) : filteredMeetings.map(meeting => (
-            <Link 
-              key={meeting.id} 
-              href={`/projects/${params.projectId}/meetings/${meeting.id}`}
-            >
-              <Card className="hover-elevate cursor-pointer" data-testid={`meeting-card-${meeting.id}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-medium text-foreground">{meeting.title}</h3>
-                        <Badge variant="secondary" className="text-xs">{meeting.status}</Badge>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3.5 h-3.5" />
-                          {meeting.date}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5" />
-                          {meeting.duration}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Users className="w-3.5 h-3.5" />
-                          {meeting.participants.length}명
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {meeting.keyPoints.map(point => (
-                          <span 
-                            key={point}
-                            className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
-                          >
-                            {point}
+          ) : (
+            filteredMeetings.map((meeting) => (
+              <Link
+                key={meeting.id}
+                href={`/projects/${params.projectId}/meetings/${meeting.id}`}
+              >
+                <Card
+                  className="hover-elevate cursor-pointer"
+                  data-testid={`meeting-card-${meeting.id}`}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-medium text-foreground">
+                            {meeting.title}
+                          </h3>
+                          <Badge variant="secondary" className="text-xs">
+                            {meeting.status}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5" />
+                            {meeting.date}
                           </span>
-                        ))}
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" />
+                            {meeting.duration}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Users className="w-3.5 h-3.5" />
+                            {meeting.participants.length}명
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {meeting.keyPoints.map((point) => (
+                            <span
+                              key={point}
+                              className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
+                            >
+                              {point}
+                            </span>
+                          ))}
+                        </div>
                       </div>
+                      <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                     </div>
-                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+                  </CardContent>
+                </Card>
+              </Link>
+            ))
+          )}
         </div>
       </div>
     </div>
   );
 }
+
