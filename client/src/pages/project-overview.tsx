@@ -803,8 +803,8 @@ export default function ProjectOverview() {
   const hasActiveFilters = activeFilter !== null || statusFilter !== null;
   
   return (
-    <div className="flex-1 overflow-auto bg-background">
-      <header className="border-b border-border bg-white sticky top-0 z-10">
+    <div className="flex-1 flex flex-col overflow-hidden bg-background">
+      <header className="flex-shrink-0 border-b border-border bg-white">
         <div className="px-6 py-4">
           <h1 className="text-xl font-semibold text-foreground" data-testid="text-project-title">
             프로젝트 {params.projectId}
@@ -813,7 +813,7 @@ export default function ProjectOverview() {
         </div>
       </header>
       
-      <div className="px-6 py-6">
+      <div className="flex-1 overflow-auto px-6 py-6">
         <div className="flex gap-6">
           <main className="flex-1 min-w-0">
             <FilterSortBar
@@ -888,11 +888,25 @@ export default function ProjectOverview() {
                   </h2>
                   <Badge variant="secondary" className="ml-auto">{filteredDecisions.length}</Badge>
                 </div>
-                <div className="space-y-4" data-testid="list-decisions">
-                  {filteredDecisions.map(decision => (
-                    <DecisionCard key={decision.id} decision={decision} />
-                  ))}
-                </div>
+                <Card className="border border-border">
+                  <div className="max-h-[480px] overflow-y-auto p-4">
+                    <div className="space-y-4" data-testid="list-decisions">
+                      {filteredDecisions.slice(0, 3).map(decision => (
+                        <DecisionCard key={decision.id} decision={decision} />
+                      ))}
+                    </div>
+                    {filteredDecisions.length > 3 && (
+                      <div className="pt-4 border-t border-border mt-4">
+                        <p className="text-sm text-muted-foreground mb-3">추가 결정사항 ({filteredDecisions.length - 3}개)</p>
+                        <div className="space-y-4">
+                          {filteredDecisions.slice(3).map(decision => (
+                            <DecisionCard key={decision.id} decision={decision} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
               </section>
             )}
 

@@ -37,8 +37,8 @@ export default function MeetingsPage() {
   const params = useParams<{ projectId: string }>();
 
   return (
-    <div className="flex-1 overflow-auto">
-      <header className="border-b border-border bg-white sticky top-0 z-10">
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <header className="flex-shrink-0 border-b border-border bg-white">
         <div className="px-6 py-4">
           <h1 className="text-xl font-semibold text-foreground" data-testid="text-page-title">
             Meetings
@@ -47,7 +47,7 @@ export default function MeetingsPage() {
         </div>
       </header>
 
-      <div className="p-6">
+      <div className="flex-1 overflow-auto p-6">
         <div className="space-y-3">
           {meetingsData.map(meeting => (
             <Link 

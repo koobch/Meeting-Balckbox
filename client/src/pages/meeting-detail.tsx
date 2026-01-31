@@ -19,7 +19,9 @@ import {
   Lightbulb,
   Check,
   X,
-  UserCog
+  UserCog,
+  Inbox,
+  ExternalLink
 } from "lucide-react";
 
 type LogicMarkType = "leap" | "missing" | "ambiguous";
@@ -212,6 +214,38 @@ const paragraphSummaries: ParagraphSummary[] = [
   { id: "ps-3", timeRange: "04:00 - 06:00", summary: "협업 기능 중 실시간 편집은 1.1 버전으로 연기, 코멘트 기능만 MVP 포함. 가격 정책은 추가 조사 필요." },
   { id: "ps-4", timeRange: "06:00 - 09:00", summary: "UI 개선점: 다크모드, 대시보드 시각화 추가. 모바일 사용률 40%로 반응형 디자인 필수. 이메일 알림 MVP 포함." },
   { id: "ps-5", timeRange: "09:00 - 12:35", summary: "MVP 스코프 확정: 온보딩, 템플릿, 코멘트, 시각화, 반응형, 다크모드, 이메일 알림. 2월 10일 개발 완료, 15일 출시 목표." }
+];
+
+interface EvidenceDrop {
+  id: string;
+  title: string;
+  summary: string;
+  source: string;
+  relevantFinding: string;
+}
+
+const evidenceDrops: EvidenceDrop[] = [
+  {
+    id: "ed-1",
+    title: "Nielsen Norman Group 온보딩 연구",
+    summary: "SaaS 온보딩 황금 시간 3-5분. 5분 초과 시 이탈률 급증.",
+    source: "nngroup.com",
+    relevantFinding: "lf-1"
+  },
+  {
+    id: "ed-2",
+    title: "2024 SaaS 가격 전략 보고서",
+    summary: "경쟁사 대비 가격 책정 전략 분석. 중소기업 타겟 시 10-20% 저렴한 가격 권장.",
+    source: "OpenView Partners",
+    relevantFinding: "lf-2"
+  },
+  {
+    id: "ed-3",
+    title: "모바일 사용 패턴 대규모 조사",
+    summary: "PM 도구 사용자 1,200명 대상 조사. 모바일 사용률 35-45% 확인.",
+    source: "ProductPlan",
+    relevantFinding: "lf-3"
+  }
 ];
 
 interface DecisionSummary {
@@ -701,7 +735,7 @@ export default function MeetingDetail() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <ScrollArea className="h-80">
+                <ScrollArea className="h-64">
                   <div className="p-3 space-y-3">
                     <p className="text-xs text-muted-foreground mb-2">
                       논의 내용에서 검토가 필요할 수 있는 부분을 참고용으로 정리했습니다.
@@ -714,6 +748,47 @@ export default function MeetingDetail() {
                         onScrollToLine={scrollToTranscriptLine}
                       />
                     ))}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="section-evidence-drops">
+              <CardHeader className="py-3 px-4 border-b border-border">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Inbox className="w-4 h-4 text-violet-600" />
+                  Evidence Drops
+                  <Badge variant="secondary" className="ml-auto text-xs bg-violet-100 text-violet-600">
+                    {evidenceDrops.length}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <ScrollArea className="h-48">
+                  <div className="p-3">
+                    <p className="text-xs text-muted-foreground mb-3">
+                      부족한 근거/논리를 보완할 수 있는 추천 자료입니다.
+                    </p>
+                    <ul className="space-y-3">
+                      {evidenceDrops.map(drop => (
+                        <li 
+                          key={drop.id} 
+                          className="group p-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
+                          data-testid={`evidence-drop-${drop.id}`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <h4 className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                              {drop.title}
+                            </h4>
+                            <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{drop.summary}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-primary">{drop.source}</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </ScrollArea>
               </CardContent>

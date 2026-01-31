@@ -8,9 +8,20 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { FileText, ExternalLink, Calendar, Upload, Download, X, File, Plus } from "lucide-react";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { FileText, ExternalLink, Calendar, Upload, Download, Trash2, File } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface EvidenceItem {
@@ -33,7 +44,9 @@ const initialEvidenceData: EvidenceItem[] = [
     source: "내부 리서치",
     type: "interview",
     addedAt: "2025-01-29",
-    linkedDecisions: ["dec-1", "dec-2"]
+    linkedDecisions: ["dec-1", "dec-2"],
+    fileName: "user_interviews.pdf",
+    fileSize: "3.2 MB"
   },
   {
     id: "ev-2",
@@ -42,7 +55,9 @@ const initialEvidenceData: EvidenceItem[] = [
     source: "nngroup.com",
     type: "external",
     addedAt: "2025-01-28",
-    linkedDecisions: ["dec-1"]
+    linkedDecisions: ["dec-1"],
+    fileName: "nngroup_onboarding.pdf",
+    fileSize: "1.8 MB"
   },
   {
     id: "ev-3",
@@ -51,7 +66,9 @@ const initialEvidenceData: EvidenceItem[] = [
     source: "productplan.com",
     type: "external",
     addedAt: "2025-01-28",
-    linkedDecisions: ["dec-1"]
+    linkedDecisions: ["dec-1"],
+    fileName: "productplan_benchmark.pdf",
+    fileSize: "2.1 MB"
   },
   {
     id: "ev-4",
@@ -71,7 +88,9 @@ const initialEvidenceData: EvidenceItem[] = [
     source: "미팅 기록",
     type: "meeting",
     addedAt: "2025-01-25",
-    linkedDecisions: ["dec-3"]
+    linkedDecisions: ["dec-3"],
+    fileName: "tech_review_meeting.pdf",
+    fileSize: "0.8 MB"
   }
 ];
 
@@ -91,6 +110,7 @@ export default function EvidencePage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadSummary, setUploadSummary] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<EvidenceItem | null>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -147,6 +167,19 @@ export default function EvidencePage() {
     }
   };
 
+  const handleDelete = () => {
+    if (!deleteTarget) return;
+
+    setEvidenceData(prev => prev.filter(e => e.id !== deleteTarget.id));
+    
+    toast({
+      title: "삭제 완료",
+      description: `${deleteTarget.title} 자료가 삭제되었습니다.`
+    });
+
+    setDeleteTarget(null);
+  };
+
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -154,8 +187,8 @@ export default function EvidencePage() {
   };
 
   return (
-    <div className="flex-1 overflow-auto">
-      <header className="border-b border-border bg-white sticky top-0 z-10">
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <header className="flex-shrink-0 border-b border-border bg-white">
         <div className="px-6 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-foreground" data-testid="text-page-title">
@@ -183,7 +216,7 @@ export default function EvidencePage() {
         </div>
       </header>
 
-      <div className="p-6">
+      <div className="flex-1 overflow-auto p-6">
         <div className="space-y-3">
           {evidenceData.map(evidence => {
             const typeInfo = typeConfig[evidence.type as keyof typeof typeConfig];
@@ -224,18 +257,28 @@ export default function EvidencePage() {
                         <span>연결된 결정 {evidence.linkedDecisions.length}개</span>
                       </div>
                     </div>
-                    {evidence.fileName && (
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleDownload(evidence)}
-                        className="flex-shrink-0 gap-1"
+                        className="gap-1"
                         data-testid={`button-download-${evidence.id}`}
                       >
                         <Download className="w-3.5 h-3.5" />
                         다운로드
                       </Button>
-                    )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDeleteTarget(evidence)}
+                        className="gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        data-testid={`button-delete-${evidence.id}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        삭제
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -248,6 +291,7 @@ export default function EvidencePage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>파일 정보 입력</DialogTitle>
+            <DialogDescription>업로드할 파일의 정보를 입력해주세요.</DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
             {uploadFile && (
@@ -298,6 +342,27 @@ export default function EvidencePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>삭제하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{deleteTarget?.title}" 자료를 삭제합니다. 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

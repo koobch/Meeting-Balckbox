@@ -8,6 +8,7 @@ import ProjectOverview from "@/pages/project-overview";
 import MeetingDetail from "@/pages/meeting-detail";
 import MeetingsPage from "@/pages/meetings";
 import EvidencePage from "@/pages/evidence";
+import ProjectsPage from "@/pages/projects";
 import { ProjectLayout } from "@/pages/project-layout";
 import { ChatLauncher } from "@/components/chat-launcher";
 
@@ -31,6 +32,7 @@ function Router() {
       <Route path="/">
         <Redirect to="/projects/1/overview" />
       </Route>
+      <Route path="/projects" component={ProjectsPage} />
       <Route path="/projects/:projectId/*">
         <ProjectRoutes />
       </Route>

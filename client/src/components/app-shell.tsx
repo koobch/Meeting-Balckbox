@@ -8,7 +8,10 @@ import {
   Mic,
   Square,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ChevronDown,
+  Check,
+  FolderKanban
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,12 +22,29 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface NavItem {
   href: string;
   label: string;
   icon: typeof LayoutDashboard;
 }
+
+interface Project {
+  id: string;
+  name: string;
+}
+
+const projects: Project[] = [
+  { id: "1", name: "TRACE PM MVP" },
+  { id: "2", name: "모바일 앱 리디자인" },
+  { id: "3", name: "B2B 플랫폼 구축" },
+];
 
 interface AppShellProps {
   projectId: string;
@@ -39,6 +59,8 @@ export function AppShell({ projectId, children }: AppShellProps) {
   const [showTitleDialog, setShowTitleDialog] = useState(false);
   const [meetingTitle, setMeetingTitle] = useState("");
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const currentProject = projects.find(p => p.id === projectId) || projects[0];
 
   const navItems: NavItem[] = [
     { href: `/projects/${projectId}/overview`, label: "Overview", icon: LayoutDashboard },
@@ -88,25 +110,59 @@ export function AppShell({ projectId, children }: AppShellProps) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleProjectChange = (newProjectId: string) => {
+    navigate(`/projects/${newProjectId}/overview`);
+  };
+
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="h-screen flex bg-background overflow-hidden">
       <aside 
-        className={`flex-shrink-0 border-r border-border bg-white flex flex-col transition-all duration-300 relative ${
+        className={`flex-shrink-0 h-screen border-r border-border bg-white flex flex-col transition-all duration-300 ${
           isCollapsed ? "w-16" : "w-64"
         }`}
         data-testid="sidebar-main"
       >
-        <div className="p-4 border-b border-border flex items-center justify-between gap-2">
+        <div className="flex-shrink-0 p-4 border-b border-border">
           {!isCollapsed ? (
-            <>
-              <Link href={`/projects/${projectId}/overview`}>
-                <div className="flex items-center gap-2" data-testid="logo">
-                  <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center flex-shrink-0">
-                    <span className="text-primary-foreground text-sm font-bold">T</span>
-                  </div>
-                  <span className="text-lg font-semibold text-foreground">TRACE PM</span>
-                </div>
-              </Link>
+            <div className="flex items-center justify-between gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button 
+                    className="flex items-center gap-2 hover:bg-muted rounded-md p-1 -m-1 transition-colors flex-1 min-w-0"
+                    data-testid="dropdown-project-selector"
+                  >
+                    <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center flex-shrink-0">
+                      <span className="text-primary-foreground text-sm font-bold">T</span>
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className="text-sm font-semibold text-foreground truncate">{currentProject.name}</p>
+                      <p className="text-xs text-muted-foreground">프로젝트</p>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  {projects.map(project => (
+                    <DropdownMenuItem
+                      key={project.id}
+                      onClick={() => handleProjectChange(project.id)}
+                      className="flex items-center justify-between"
+                      data-testid={`menu-item-project-${project.id}`}
+                    >
+                      <span>{project.name}</span>
+                      {project.id === projectId && <Check className="w-4 h-4 text-primary" />}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuItem 
+                    onClick={() => navigate("/projects")}
+                    className="border-t mt-1 pt-2"
+                    data-testid="menu-item-all-projects"
+                  >
+                    <FolderKanban className="w-4 h-4 mr-2" />
+                    모든 프로젝트 보기
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 variant="ghost"
                 size="icon"
@@ -116,9 +172,9 @@ export function AppShell({ projectId, children }: AppShellProps) {
               >
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-            </>
+            </div>
           ) : (
-            <div className="flex flex-col items-center gap-2 w-full">
+            <div className="flex flex-col items-center gap-2">
               <Link href={`/projects/${projectId}/overview`}>
                 <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center" data-testid="logo-collapsed">
                   <span className="text-primary-foreground text-sm font-bold">T</span>
@@ -137,7 +193,7 @@ export function AppShell({ projectId, children }: AppShellProps) {
           )}
         </div>
 
-        <div className={`p-3 ${isCollapsed ? "px-2" : ""}`}>
+        <div className={`flex-shrink-0 p-3 ${isCollapsed ? "px-2" : ""}`}>
           {isRecording ? (
             <Button
               onClick={stopRecording}
@@ -181,7 +237,7 @@ export function AppShell({ projectId, children }: AppShellProps) {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         {children}
       </main>
 
