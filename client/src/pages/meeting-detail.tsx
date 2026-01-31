@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { 
   ChevronLeft,
+  ChevronRight,
   Play,
   Pause,
   Clock,
@@ -428,7 +429,8 @@ export default function MeetingDetail() {
   const [activeLine, setActiveLine] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [highlightedFinding, setHighlightedFinding] = useState<string | null>(null);
-  const [selectedFinding, setSelectedFinding] = useState<string>(logicFindings[0]?.id || "");
+  const [selectedFindingIndex, setSelectedFindingIndex] = useState(0);
+  const selectedFinding = logicFindings[selectedFindingIndex]?.id || "";
   const [role, setRole] = useState<"lead" | "member">("lead");
   const [meetingTitle, setMeetingTitle] = useState(meetingInfo.title);
   const [projectName, setProjectName] = useProjectName(projectId);
@@ -570,6 +572,23 @@ export default function MeetingDetail() {
     }, 2500);
   };
 
+  const goToPrevFinding = () => {
+    setSelectedFindingIndex(prev => prev > 0 ? prev - 1 : logicFindings.length - 1);
+  };
+
+  const goToNextFinding = () => {
+    setSelectedFindingIndex(prev => prev < logicFindings.length - 1 ? prev + 1 : 0);
+  };
+
+  const scrollToTranscriptLine = (lineId: string) => {
+    const element = document.querySelector(`[data-testid="transcript-line-${lineId}"]`);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      setActiveLine(lineId);
+      setTimeout(() => setActiveLine(null), 3000);
+    }
+  };
+
   useEffect(() => {
     if (researchState === "loading") {
       const interval = setInterval(() => {
@@ -698,12 +717,6 @@ export default function MeetingDetail() {
     const element = document.querySelector(`[data-testid="logic-finding-${findingId}"]`);
     element?.scrollIntoView({ behavior: "smooth", block: "center" });
     setTimeout(() => setHighlightedFinding(null), 3000);
-  };
-
-  const scrollToTranscriptLine = (lineId: string) => {
-    setActiveLine(lineId);
-    const element = document.querySelector(`[data-testid="transcript-line-${lineId}"]`);
-    element?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
   return (
@@ -966,35 +979,95 @@ export default function MeetingDetail() {
             <Card ref={logicFindingsRef} data-testid="summary-logic-findings" className="relative">
               <CardHeader className="py-3 px-4 border-b border-border">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <HelpCircle className="w-4 h-4 text-slate-500" />
+                  <AlertTriangle className="w-4 h-4 text-orange-500" />
                   Logic Findings
-                  <Badge variant="secondary" className="ml-auto text-xs bg-slate-100 text-slate-600">
+                  <Badge variant="secondary" className="ml-auto text-xs bg-orange-100 text-orange-600">
                     {logicFindings.length}
                   </Badge>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-2">
-                <ul className="flex flex-wrap gap-2">
-                  {logicFindings.map((finding) => (
-                    <li 
-                      key={finding.id} 
-                      className={`flex items-center gap-2 cursor-pointer rounded px-2.5 py-1.5 transition-all border ${
-                        selectedFinding === finding.id 
-                          ? "bg-primary/10 border-primary shadow-sm" 
-                          : "border-border hover:bg-muted/50 hover:border-muted-foreground/30"
-                      }`}
-                      onClick={() => setSelectedFinding(finding.id)}
-                      data-testid={`logic-summary-${finding.id}`}
-                    >
-                      <div className={`px-1.5 py-0.5 text-xs rounded border flex-shrink-0 ${logicMarkConfig[finding.type].className}`}>
-                        {finding.type}
+              <CardContent className="p-3">
+                {logicFindings.length > 0 && (
+                  <div className="relative">
+                    <div className="flex items-center gap-2">
+                      {logicFindings.length > 1 && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={goToPrevFinding}
+                          className="flex-shrink-0"
+                          data-testid="button-prev-finding"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        {(() => {
+                          const finding = logicFindings[selectedFindingIndex];
+                          if (!finding) return null;
+                          return (
+                            <div 
+                              className="p-3 rounded-md border border-border border-dashed transition-colors"
+                              data-testid={`logic-finding-card-${finding.id}`}
+                            >
+                              <div className="flex items-start justify-between gap-3 mb-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 rounded bg-orange-100 flex items-center justify-center flex-shrink-0">
+                                    <AlertTriangle className="w-3.5 h-3.5 text-orange-600" />
+                                  </div>
+                                  <h3 className="text-sm font-medium text-foreground line-clamp-1">{finding.claim}</h3>
+                                </div>
+                                <Badge variant="outline" className={`text-xs flex-shrink-0 ${logicMarkConfig[finding.type].className}`}>
+                                  {logicMarkConfig[finding.type].description}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{finding.gap}</p>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200 text-xs">
+                                  <MessageSquare className="w-3 h-3 mr-1" />
+                                  {finding.relatedLineIds.length}개 관련 발언
+                                </Badge>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => scrollToTranscriptLine(finding.relatedLineIds[0])}
+                                  data-testid={`button-view-transcript-${finding.id}`}
+                                >
+                                  발언 보기
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
-                      <span className={`text-xs ${selectedFinding === finding.id ? "text-foreground font-medium" : "text-muted-foreground"}`}>
-                        {finding.claim.length > 30 ? finding.claim.substring(0, 30) + "..." : finding.claim}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                      {logicFindings.length > 1 && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={goToNextFinding}
+                          className="flex-shrink-0"
+                          data-testid="button-next-finding"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                    {logicFindings.length > 1 && (
+                      <div className="flex justify-center gap-1 mt-2">
+                        {logicFindings.map((_, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setSelectedFindingIndex(idx)}
+                            className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                              idx === selectedFindingIndex ? "bg-primary" : "bg-muted-foreground/30"
+                            }`}
+                            data-testid={`finding-indicator-${idx}`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
               {selectedFinding && (
                 <div className="absolute left-1/2 -bottom-1 -translate-x-1/2 flex flex-col items-center" data-testid="connection-line">
