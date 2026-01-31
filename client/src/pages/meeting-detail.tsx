@@ -617,8 +617,8 @@ export default function MeetingDetail() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto px-6 py-4">
-        <section className="mb-4 space-y-4" data-testid="section-summary">
+      <div className="flex-1 overflow-hidden px-6 py-4 flex flex-col">
+        <section className="mb-4 space-y-4 flex-shrink-0" data-testid="section-summary">
           <div className="grid grid-cols-2 gap-4">
             <Card data-testid="summary-decisions">
               <CardHeader className="py-3 px-4 border-b border-border">
@@ -771,10 +771,10 @@ export default function MeetingDetail() {
           </div>
         </section>
 
-        <div className="flex gap-6 items-stretch">
-          <main className="flex-1 min-w-0" ref={scrollRef}>
-            <Card className="h-full" data-testid="card-transcript">
-              <CardHeader className="py-3 px-4 border-b border-border">
+        <div className="flex gap-6 flex-1 min-h-0">
+          <main className="flex-1 min-w-0 flex flex-col" ref={scrollRef}>
+            <Card className="flex-1 flex flex-col overflow-hidden" data-testid="card-transcript">
+              <CardHeader className="py-3 px-4 border-b border-border flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
                     <MessageSquare className="w-4 h-4 text-primary" />
@@ -783,7 +783,7 @@ export default function MeetingDetail() {
                   <span className="text-xs text-muted-foreground">{transcript.length}개 발언</span>
                 </div>
               </CardHeader>
-              <CardContent className="p-0">
+              <div className="flex-1 overflow-auto">
                 <div className="divide-y divide-border/50">
                   {transcript.map(line => (
                     <TranscriptItem 
@@ -794,58 +794,56 @@ export default function MeetingDetail() {
                     />
                   ))}
                 </div>
-              </CardContent>
+              </div>
             </Card>
           </main>
 
-          <aside className="w-80 flex-shrink-0" data-testid="sidebar-summary">
-            <div className="flex flex-col gap-4">
-              <Card>
-                <CardHeader className="py-3 px-4 border-b border-border">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-violet-600" />
-                    주요 주제
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <ul className="divide-y divide-border/50">
-                    {topics.map(topic => (
-                      <li key={topic.id}>
-                        <button
-                          onClick={() => scrollToTime(topic.startTime)}
-                          className="w-full px-4 py-2.5 text-left hover:bg-muted/50 transition-colors flex items-center justify-between gap-2"
-                          data-testid={`topic-${topic.id}`}
-                        >
-                          <span className="text-sm text-foreground">{topic.title}</span>
-                          <span className="text-xs text-muted-foreground flex-shrink-0">{topic.startTime}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
+          <aside className="w-80 flex-shrink-0 flex flex-col gap-4" data-testid="sidebar-summary">
+            <Card className="flex-1 flex flex-col overflow-hidden">
+              <CardHeader className="py-3 px-4 border-b border-border flex-shrink-0">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-violet-600" />
+                  주요 주제
+                </CardTitle>
+              </CardHeader>
+              <div className="flex-1 overflow-auto">
+                <ul className="divide-y divide-border/50">
+                  {topics.map(topic => (
+                    <li key={topic.id}>
+                      <button
+                        onClick={() => scrollToTime(topic.startTime)}
+                        className="w-full px-4 py-2.5 text-left hover:bg-muted/50 transition-colors flex items-center justify-between gap-2"
+                        data-testid={`topic-${topic.id}`}
+                      >
+                        <span className="text-sm text-foreground">{topic.title}</span>
+                        <span className="text-xs text-muted-foreground flex-shrink-0">{topic.startTime}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Card>
 
-              <Card data-testid="card-paragraph-summaries">
-                <CardHeader className="py-3 px-4 border-b border-border">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-amber-600" />
-                    단락별 요약
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <ul className="divide-y divide-border/50">
-                    {paragraphSummaries.map(summary => (
-                      <li key={summary.id} className="p-3" data-testid={`summary-${summary.id}`}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-medium text-primary">{summary.timeRange}</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed">{summary.summary}</p>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            </div>
+            <Card className="flex-1 flex flex-col overflow-hidden" data-testid="card-paragraph-summaries">
+              <CardHeader className="py-3 px-4 border-b border-border flex-shrink-0">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-amber-600" />
+                  단락별 요약
+                </CardTitle>
+              </CardHeader>
+              <div className="flex-1 overflow-auto">
+                <ul className="divide-y divide-border/50">
+                  {paragraphSummaries.map(summary => (
+                    <li key={summary.id} className="p-3" data-testid={`summary-${summary.id}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-medium text-primary">{summary.timeRange}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{summary.summary}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Card>
           </aside>
         </div>
       </div>
