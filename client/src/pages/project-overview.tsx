@@ -624,25 +624,27 @@ function GapItem({ gap }: { gap: GapData }) {
 
 function LiveBriefCard() {
   return (
-    <Card data-testid="card-live-brief">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-semibold flex items-center gap-2">
-          <Target className="w-4 h-4 text-primary" />
+    <Card className="border-2 border-primary/20 bg-primary/5" data-testid="card-live-brief">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-bold flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+            <Target className="w-5 h-5 text-white" />
+          </div>
           Live Brief
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-4">
         <div>
-          <p className="text-xs text-muted-foreground mb-0.5">현재 목표</p>
-          <p className="text-sm text-foreground">{liveBrief.currentGoal}</p>
+          <p className="text-sm text-muted-foreground mb-1">현재 목표</p>
+          <p className="text-lg font-semibold text-foreground">{liveBrief.currentGoal}</p>
         </div>
         <div>
-          <p className="text-xs text-muted-foreground mb-0.5">최신 결정</p>
-          <p className="text-sm text-foreground">{liveBrief.latestDecision}</p>
+          <p className="text-sm text-muted-foreground mb-1">최신 결정</p>
+          <p className="text-base text-foreground">{liveBrief.latestDecision}</p>
         </div>
         <div>
-          <p className="text-xs text-muted-foreground mb-0.5">이번 주 리스크</p>
-          <p className="text-sm text-orange-600">{liveBrief.weeklyRisk}</p>
+          <p className="text-sm text-muted-foreground mb-1">이번 주 리스크</p>
+          <p className="text-base font-medium text-orange-600">{liveBrief.weeklyRisk}</p>
         </div>
       </CardContent>
     </Card>
@@ -1011,189 +1013,35 @@ export default function ProjectOverview() {
       </header>
       
       <div className="flex-1 overflow-auto px-6 py-6">
-        <div className="space-y-4 mb-6" data-testid="section-top-row">
+        <div className="space-y-4" data-testid="section-top-row">
           <div className="grid grid-cols-2 gap-4">
             <LiveBriefCard />
             <ActionItemsCard />
           </div>
-          <MeetingIntegrationCalendar projectId={params.projectId || "1"} />
-          <DecisionIntegrityCard 
-            activeFilter={activeFilter} 
-            onFilterChange={setActiveFilter} 
-          />
-        </div>
-
-        <FilterSortBar
-          statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
-          sortType={sortType}
-          onSortChange={setSortType}
-          visibility={visibility}
-          onVisibilityChange={setVisibility}
-        />
-
-        {hasActiveFilters && (
-          <div className="mb-4 flex items-center gap-2 flex-wrap" data-testid="filter-indicator">
-            {activeFilter && (
-              <Badge variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-1">
-                <span className="text-xs">
-                  {activeFilter === "weak" ? "Weak Evidence" : activeFilter === "logic-flags" ? "Logic Flags" : "Missing Evidence"}
-                </span>
-                <button 
-                  onClick={() => setActiveFilter(null)}
-                  className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20"
-                  data-testid="button-clear-sidebar-filter"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </Badge>
-            )}
-            {statusFilter && (
-              <Badge variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-1">
-                <span className="text-xs">
-                  {statusFilter === "weak" ? "Weak only" : statusFilter === "flags" ? "Flags only" : "Integrated only"}
-                </span>
-                <button 
-                  onClick={() => setStatusFilter(null)}
-                  className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20"
-                  data-testid="button-clear-status-filter"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </Badge>
-            )}
-            <button
-              onClick={() => { setActiveFilter(null); setStatusFilter(null); }}
-              className="text-xs text-muted-foreground hover:text-foreground"
-              data-testid="button-clear-all-filters"
-            >
-              모두 해제
-            </button>
-          </div>
-        )}
-
-        {!hasResults && hasActiveFilters && (
-          <div className="py-12 text-center" data-testid="empty-filter-result">
-            <p className="text-muted-foreground">해당 필터에 맞는 항목이 없습니다.</p>
-            <button 
-              onClick={() => { setActiveFilter(null); setStatusFilter(null); }}
-              className="mt-2 text-sm text-primary hover:underline"
-            >
-              필터 해제
-            </button>
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-6 mb-6" data-testid="section-middle-row">
-          {(filteredDecisions.length > 0 || !hasActiveFilters) && (
-            <section>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center">
-                  <Lightbulb className="w-3.5 h-3.5 text-primary" />
-                </div>
-                <h2 className="text-base font-semibold text-foreground" data-testid="section-decisions-title">
-                  주요 결정사항
-                </h2>
-                <Badge variant="secondary" className="ml-auto">{filteredDecisions.length}</Badge>
-              </div>
-              <Card className="border border-border">
-                <div className="max-h-[400px] overflow-y-auto p-4">
-                  {filteredDecisions.length > 0 ? (
-                    <div className="space-y-4" data-testid="list-decisions">
-                      {filteredDecisions.map(decision => (
-                        <DecisionCard key={decision.id} decision={decision} />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-8">결정사항이 없습니다.</p>
-                  )}
-                </div>
-              </Card>
-            </section>
-          )}
-
-          {(filteredMeetings.length > 0 || !hasActiveFilters) && (
-            <section>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-6 h-6 rounded bg-violet-100 flex items-center justify-center">
-                  <Calendar className="w-3.5 h-3.5 text-violet-600" />
-                </div>
-                <h2 className="text-base font-semibold text-foreground" data-testid="section-meetings-title">
-                  미팅 기록
-                </h2>
-                <Badge variant="secondary" className="ml-auto">{filteredMeetings.length}</Badge>
-              </div>
-              <Card className="border border-border">
-                <div className="max-h-[400px] overflow-y-auto p-4">
-                  {filteredMeetings.length > 0 ? (
-                    <div className="space-y-4" data-testid="list-meetings">
-                      {filteredMeetings.map(meeting => (
-                        <MeetingCard key={meeting.id} meeting={meeting} />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-8">미팅 기록이 없습니다.</p>
-                  )}
-                </div>
-              </Card>
-            </section>
-          )}
-        </div>
-
-        <section data-testid="section-bottom-row">
-          <Card>
-            <CardHeader className="py-3 px-4 border-b border-border">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-orange-600" />
-                보완 필요 항목
-                <Badge variant="secondary" className="ml-2">{filteredGaps.length}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
-                    <AlertCircle className="w-3.5 h-3.5 text-orange-500" />
-                    Gaps
-                  </h3>
-                  {filteredGaps.length > 0 ? (
-                    <div className="space-y-3" data-testid="list-gaps">
-                      {filteredGaps.map(gap => (
-                        <GapItem key={gap.id} gap={gap} />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">보완 필요 항목이 없습니다.</p>
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
-                    <Inbox className="w-3.5 h-3.5 text-violet-600" />
-                    Evidence Drops
-                  </h3>
-                  <ul className="space-y-3" data-testid="list-evidence-drops">
-                    {evidenceDrops.map(evidence => (
-                      <li key={evidence.id} className="group p-3 rounded-md hover:bg-muted/50 transition-colors border border-border" data-testid={`evidence-drop-${evidence.id}`}>
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="text-sm font-medium text-foreground group-hover:text-primary transition-colors cursor-pointer">
-                            {evidence.title}
-                          </h4>
-                          <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{evidence.summary}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-primary">{evidence.source}</span>
-                          <span className="text-xs text-muted-foreground">•</span>
-                          <span className="text-xs text-muted-foreground">{evidence.addedAt}</span>
-                        </div>
-                      </li>
+          <div className="grid grid-cols-2 gap-4">
+            <MeetingIntegrationCalendar projectId={params.projectId || "1"} />
+            <Card data-testid="card-gaps">
+              <CardHeader className="py-3 px-4 border-b border-border">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-orange-600" />
+                  보완 필요 항목
+                  <Badge variant="secondary" className="ml-2">{gaps.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                {gaps.length > 0 ? (
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto" data-testid="list-gaps">
+                    {gaps.map(gap => (
+                      <GapItem key={gap.id} gap={gap} />
                     ))}
-                  </ul>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </section>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">보완 필요 항목이 없습니다.</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
