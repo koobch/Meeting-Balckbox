@@ -3,6 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { useProjectName } from "@/lib/project-context";
 import { InlineEditableText } from "@/components/inline-editable-text";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -17,6 +18,7 @@ import {
   FileText, 
   Link2, 
   ChevronRight,
+  ChevronLeft,
   Zap,
   Target,
   CheckSquare,
@@ -245,53 +247,37 @@ const evidenceDrops: EvidenceDrop[] = [
   }
 ];
 
-function generateCalendarData(): CalendarDay[] {
-  const year = 2025;
-  const month = 0; // January
+const meetingsData: Record<string, Record<number, { 
+  meetingId: string; 
+  meetingTitle: string;
+  todoStats: { total: number; completed: number };
+}>> = {
+  "2026-0": {
+    6: { meetingId: "m1", meetingTitle: "킥오프 미팅", todoStats: { total: 3, completed: 3 } },
+    10: { meetingId: "m2", meetingTitle: "기술 스택 논의", todoStats: { total: 4, completed: 4 } },
+    15: { meetingId: "m3", meetingTitle: "사용자 리서치 리뷰", todoStats: { total: 5, completed: 2 } },
+    20: { meetingId: "m4", meetingTitle: "MVP 범위 확정", todoStats: { total: 6, completed: 6 } },
+    22: { meetingId: "m5", meetingTitle: "디자인 리뷰", todoStats: { total: 4, completed: 1 } },
+    25: { meetingId: "m6", meetingTitle: "스프린트 계획", todoStats: { total: 3, completed: 0 } },
+    29: { meetingId: "m7", meetingTitle: "가격 정책 논의", todoStats: { total: 5, completed: 0 } }
+  },
+  "2025-11": {
+    5: { meetingId: "m8", meetingTitle: "연말 리뷰", todoStats: { total: 2, completed: 2 } },
+    12: { meetingId: "m9", meetingTitle: "로드맵 계획", todoStats: { total: 3, completed: 1 } },
+    18: { meetingId: "m10", meetingTitle: "팀 회고", todoStats: { total: 4, completed: 4 } }
+  },
+  "2026-1": {
+    3: { meetingId: "m11", meetingTitle: "2월 계획 회의", todoStats: { total: 3, completed: 0 } },
+    14: { meetingId: "m12", meetingTitle: "밸런타인 스프린트", todoStats: { total: 5, completed: 2 } },
+    21: { meetingId: "m13", meetingTitle: "기능 리뷰", todoStats: { total: 4, completed: 3 } }
+  }
+};
+
+function generateCalendarData(year: number, month: number): CalendarDay[] {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfWeek = new Date(year, month, 1).getDay();
   
-  const meetingsMap: Record<number, { 
-    meetingId: string; 
-    meetingTitle: string;
-    todoStats: { total: number; completed: number };
-  }> = {
-    6: { 
-      meetingId: "m1", 
-      meetingTitle: "킥오프 미팅",
-      todoStats: { total: 3, completed: 3 }
-    },
-    10: { 
-      meetingId: "m2", 
-      meetingTitle: "기술 스택 논의",
-      todoStats: { total: 4, completed: 4 }
-    },
-    15: { 
-      meetingId: "m3", 
-      meetingTitle: "사용자 리서치 리뷰",
-      todoStats: { total: 5, completed: 2 }
-    },
-    20: { 
-      meetingId: "m4", 
-      meetingTitle: "MVP 범위 확정",
-      todoStats: { total: 6, completed: 6 }
-    },
-    22: { 
-      meetingId: "m5", 
-      meetingTitle: "디자인 리뷰",
-      todoStats: { total: 4, completed: 1 }
-    },
-    25: { 
-      meetingId: "m6", 
-      meetingTitle: "스프린트 계획",
-      todoStats: { total: 3, completed: 0 }
-    },
-    29: { 
-      meetingId: "m7", 
-      meetingTitle: "가격 정책 논의",
-      todoStats: { total: 5, completed: 0 }
-    }
-  };
+  const meetingsMap = meetingsData[`${year}-${month}`] || {};
   
   const days: CalendarDay[] = [];
   
@@ -321,11 +307,31 @@ function generateCalendarData(): CalendarDay[] {
   return days;
 }
 
-const calendarData = generateCalendarData();
-
 function MeetingIntegrationCalendar({ projectId }: { projectId: string }) {
   const [, setLocation] = useLocation();
+  const [currentYear, setCurrentYear] = useState(2026);
+  const [currentMonth, setCurrentMonth] = useState(0);
   const weekDays = ["일", "월", "화", "수", "목", "금", "토"];
+  
+  const calendarData = useMemo(() => generateCalendarData(currentYear, currentMonth), [currentYear, currentMonth]);
+  
+  const goToPreviousMonth = () => {
+    if (currentMonth === 0) {
+      setCurrentYear(currentYear - 1);
+      setCurrentMonth(11);
+    } else {
+      setCurrentMonth(currentMonth - 1);
+    }
+  };
+  
+  const goToNextMonth = () => {
+    if (currentMonth === 11) {
+      setCurrentYear(currentYear + 1);
+      setCurrentMonth(0);
+    } else {
+      setCurrentMonth(currentMonth + 1);
+    }
+  };
   
   const getCompletionRate = (day: CalendarDay): number => {
     if (!day.todoStats || day.todoStats.total === 0) return 0;
@@ -362,7 +368,25 @@ function MeetingIntegrationCalendar({ projectId }: { projectId: string }) {
             <Calendar className="w-4 h-4 text-primary" />
             진행 사항 확인 캘린더
           </CardTitle>
-          <span className="text-xs text-muted-foreground">2025년 1월</span>
+          <div className="flex items-center gap-1">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={goToPreviousMonth}
+              data-testid="button-prev-month"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <span className="text-xs text-muted-foreground min-w-[70px] text-center">{currentYear}년 {currentMonth + 1}월</span>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={goToNextMonth}
+              data-testid="button-next-month"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="pt-0">
@@ -374,7 +398,7 @@ function MeetingIntegrationCalendar({ projectId }: { projectId: string }) {
           ))}
         </div>
         <div className="grid grid-cols-7 gap-1">
-          {calendarData.map((day, index) => (
+          {calendarData.map((day: CalendarDay, index: number) => (
             day.day === 0 ? (
               <div key={`empty-${index}`} className="aspect-square" />
             ) : (

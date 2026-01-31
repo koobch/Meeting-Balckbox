@@ -41,7 +41,7 @@ const initialEvidenceData: EvidenceItem[] = [
     id: "ev-1",
     title: "사용자 인터뷰 녹취록",
     summary: "8명의 중소기업 PM 대상 심층 인터뷰. 온보딩 복잡성, 협업 기능, 가격에 대한 피드백 수집.",
-    source: "내부 리서치",
+    source: ".pdf",
     type: "interview",
     addedAt: "2025-01-29",
     linkedDecisions: ["dec-1", "dec-2"],
@@ -52,7 +52,7 @@ const initialEvidenceData: EvidenceItem[] = [
     id: "ev-2",
     title: "Nielsen Norman Group 온보딩 연구",
     summary: "SaaS 온보딩 황금 시간 3-5분. 5분 초과 시 이탈률 급증.",
-    source: "nngroup.com",
+    source: ".pdf",
     type: "external",
     addedAt: "2025-01-28",
     linkedDecisions: ["dec-1"],
@@ -63,29 +63,29 @@ const initialEvidenceData: EvidenceItem[] = [
     id: "ev-3",
     title: "ProductPlan 벤치마크 보고서",
     summary: "PM 도구 평균 Time-to-Value 7.2분, 상위 10% 제품 4분 미만.",
-    source: "productplan.com",
+    source: ".xlsx",
     type: "external",
     addedAt: "2025-01-28",
     linkedDecisions: ["dec-1"],
-    fileName: "productplan_benchmark.pdf",
+    fileName: "productplan_benchmark.xlsx",
     fileSize: "2.1 MB"
   },
   {
     id: "ev-4",
     title: "경쟁사 분석 문서",
     summary: "Jira, Asana, Notion 기능 및 가격 비교 분석.",
-    source: "내부 문서",
+    source: ".docx",
     type: "document",
     addedAt: "2025-01-27",
     linkedDecisions: ["dec-2", "dec-3"],
-    fileName: "competitor_analysis.pdf",
+    fileName: "competitor_analysis.docx",
     fileSize: "2.4 MB"
   },
   {
     id: "ev-5",
     title: "기술 검토 회의록",
     summary: "실시간 편집 구현 복잡도 및 일정 영향 분석.",
-    source: "미팅 기록",
+    source: ".pdf",
     type: "meeting",
     addedAt: "2025-01-25",
     linkedDecisions: ["dec-3"],
@@ -125,11 +125,15 @@ export default function EvidencePage() {
   const handleUpload = () => {
     if (!uploadFile) return;
 
+    const fileExtension = uploadFile.name.includes('.') 
+      ? '.' + uploadFile.name.split('.').pop()?.toLowerCase() 
+      : '';
+
     const newEvidence: EvidenceItem = {
       id: `ev-${Date.now()}`,
       title: uploadTitle || uploadFile.name,
       summary: uploadSummary || "업로드된 파일",
-      source: "업로드",
+      source: fileExtension || "파일",
       type: "file",
       addedAt: new Date().toISOString().split('T')[0],
       linkedDecisions: [],
