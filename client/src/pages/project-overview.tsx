@@ -599,7 +599,7 @@ function MeetingCard({ meeting }: { meeting: MeetingData }) {
   );
 }
 
-function GapItem({ gap }: { gap: GapData }) {
+function GapItem({ gap, onComplete }: { gap: GapData; onComplete: (id: string) => void }) {
   const priorityConfig = {
     high: { label: "높음", className: "bg-red-50 text-red-700 border-red-200" },
     medium: { label: "보통", className: "bg-amber-50 text-amber-700 border-amber-200" },
@@ -608,7 +608,7 @@ function GapItem({ gap }: { gap: GapData }) {
 
   return (
     <div 
-      className="p-3 rounded-md hover:bg-muted/50 transition-colors cursor-pointer border border-border border-dashed" 
+      className="p-3 rounded-md hover-elevate transition-colors border border-border border-dashed overflow-visible" 
       data-testid={`card-gap-${gap.id}`}
     >
       <div className="flex items-start justify-between gap-3 mb-2">
@@ -623,14 +623,25 @@ function GapItem({ gap }: { gap: GapData }) {
         </Badge>
       </div>
       <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{gap.description}</p>
-      <div className="flex items-center gap-2">
-        <StrengthBadge strength={gap.strength} />
-        {gap.hasLogicFlag && (
-          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs py-0">
-            <TriangleAlert className="w-3 h-3 mr-1" />
-            논리 검토
-          </Badge>
-        )}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <StrengthBadge strength={gap.strength} />
+          {gap.hasLogicFlag && (
+            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs py-0">
+              <TriangleAlert className="w-3 h-3 mr-1" />
+              논리 검토
+            </Badge>
+          )}
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => onComplete(gap.id)}
+          data-testid={`button-complete-gap-${gap.id}`}
+        >
+          <CheckSquare className="w-3.5 h-3.5 mr-1" />
+          보완 완료
+        </Button>
       </div>
     </div>
   );
@@ -701,7 +712,6 @@ function ActionItemsCard() {
                 className={`text-sm flex-1 cursor-pointer ${item.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}
               >
                 {item.title}
-                <span className="block text-xs text-muted-foreground">{item.assignee}</span>
               </label>
             </li>
           ))}
@@ -713,12 +723,14 @@ function ActionItemsCard() {
 
 function DecisionIntegrityCard({ 
   activeFilter, 
-  onFilterChange 
+  onFilterChange,
+  gapsData 
 }: { 
   activeFilter: FilterType; 
   onFilterChange: (filter: FilterType) => void;
+  gapsData: GapData[];
 }) {
-  const allItems = [...decisions, ...meetings, ...gaps];
+  const allItems = [...decisions, ...meetings, ...gapsData];
   const weakCount = allItems.filter(item => item.strength === "weak").length;
   const logicFlagCount = allItems.filter(item => item.hasLogicFlag).length;
   const missingEvidenceCount = allItems.filter(item => item.evidenceCount < 3).length;
@@ -934,6 +946,11 @@ export default function ProjectOverview() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
   const [sortType, setSortType] = useState<SortType>("recent");
   const [visibility, setVisibility] = useState<CardVisibility>({ decisions: true, meetings: true });
+  const [gapsData, setGapsData] = useState<GapData[]>(gaps);
+
+  const handleCompleteGap = (gapId: string) => {
+    setGapsData(prev => prev.filter(gap => gap.id !== gapId));
+  };
 
   const getPriorityScore = (item: { strength: EvidenceStrength; hasLogicFlag?: boolean; priority?: string }) => {
     let score = 0;
@@ -1045,14 +1062,14 @@ export default function ProjectOverview() {
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-orange-600" />
                   보완 필요 항목
-                  <Badge variant="secondary" className="ml-2">{gaps.length}</Badge>
+                  <Badge variant="secondary" className="ml-2">{gapsData.length}</Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4">
-                {gaps.length > 0 ? (
+                {gapsData.length > 0 ? (
                   <div className="space-y-3 max-h-[300px] overflow-y-auto" data-testid="list-gaps">
-                    {gaps.map(gap => (
-                      <GapItem key={gap.id} gap={gap} />
+                    {gapsData.map(gap => (
+                      <GapItem key={gap.id} gap={gap} onComplete={handleCompleteGap} />
                     ))}
                   </div>
                 ) : (
