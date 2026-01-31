@@ -1,9 +1,17 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { saveRecentMeeting } from "@/components/app-shell";
+import { useProjectName } from "@/lib/project-context";
+import { InlineEditableText } from "@/components/inline-editable-text";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   ChevronLeft,
   Play,
@@ -22,7 +30,10 @@ import {
   X,
   UserCog,
   Inbox,
-  ExternalLink
+  ExternalLink,
+  ChevronDown,
+  Circle,
+  CircleDot
 } from "lucide-react";
 
 type LogicMarkType = "leap" | "missing" | "ambiguous";
@@ -249,20 +260,29 @@ const evidenceDrops: EvidenceDrop[] = [
   }
 ];
 
+type IntegrationStatus = "integrated" | "partial" | "not";
+
 interface DecisionSummary {
   id: string;
   title: string;
   status: "confirmed" | "deferred" | "pending";
+  integrationStatus: IntegrationStatus;
 }
 
-const decisionSummaries: DecisionSummary[] = [
-  { id: "ds-1", title: "온보딩 5분 내 완료 목표", status: "confirmed" },
-  { id: "ds-2", title: "MVP에 기본 템플릿 3종 포함", status: "confirmed" },
-  { id: "ds-3", title: "실시간 편집 기능 1.1 버전으로 연기", status: "deferred" },
-  { id: "ds-4", title: "코멘트 기능 MVP 포함", status: "confirmed" },
-  { id: "ds-5", title: "대시보드 시각화 MVP 포함", status: "confirmed" },
-  { id: "ds-6", title: "가격 정책은 추가 조사 후 결정", status: "pending" }
+const initialDecisionSummaries: DecisionSummary[] = [
+  { id: "ds-1", title: "온보딩 5분 내 완료 목표", status: "confirmed", integrationStatus: "integrated" },
+  { id: "ds-2", title: "MVP에 기본 템플릿 3종 포함", status: "confirmed", integrationStatus: "integrated" },
+  { id: "ds-3", title: "실시간 편집 기능 1.1 버전으로 연기", status: "deferred", integrationStatus: "partial" },
+  { id: "ds-4", title: "코멘트 기능 MVP 포함", status: "confirmed", integrationStatus: "integrated" },
+  { id: "ds-5", title: "대시보드 시각화 MVP 포함", status: "confirmed", integrationStatus: "not" },
+  { id: "ds-6", title: "가격 정책은 추가 조사 후 결정", status: "pending", integrationStatus: "not" }
 ];
+
+const integrationStatusConfig: Record<IntegrationStatus, { label: string; color: string; bgColor: string }> = {
+  integrated: { label: "통합됨", color: "text-emerald-600", bgColor: "bg-emerald-50" },
+  partial: { label: "부분 통합", color: "text-amber-600", bgColor: "bg-amber-50" },
+  not: { label: "미통합", color: "text-slate-500", bgColor: "bg-slate-50" }
+};
 
 function LogicMarkBadge({ 
   mark, 
@@ -396,77 +416,6 @@ function LogicFindingCard({
   );
 }
 
-function InlineEditableText({
-  value,
-  onSave,
-  className,
-  testId
-}: {
-  value: string;
-  onSave: (newValue: string) => void;
-  className?: string;
-  testId?: string;
-}) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(value);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [isEditing]);
-
-  const handleSave = () => {
-    if (editValue.trim() && editValue !== value) {
-      onSave(editValue.trim());
-    } else {
-      setEditValue(value);
-    }
-    setIsEditing(false);
-  };
-
-  const handleCancel = () => {
-    setEditValue(value);
-    setIsEditing(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSave();
-    } else if (e.key === "Escape") {
-      handleCancel();
-    }
-  };
-
-  if (isEditing) {
-    return (
-      <input
-        ref={inputRef}
-        type="text"
-        value={editValue}
-        onChange={(e) => setEditValue(e.target.value)}
-        onBlur={handleSave}
-        onKeyDown={handleKeyDown}
-        className={`bg-transparent border-b border-primary outline-none ${className}`}
-        data-testid={`${testId}-input`}
-      />
-    );
-  }
-
-  return (
-    <span
-      onDoubleClick={() => setIsEditing(true)}
-      className={`cursor-text hover:bg-muted/50 rounded px-1 -mx-1 transition-colors ${className}`}
-      title="더블클릭하여 편집"
-      data-testid={testId}
-    >
-      {value}
-    </span>
-  );
-}
-
 export default function MeetingDetail() {
   const params = useParams<{ projectId: string; meetingId: string }>();
   const [activeLine, setActiveLine] = useState<string | null>(null);
@@ -477,11 +426,26 @@ export default function MeetingDetail() {
   const [pendingMerge, setPendingMerge] = useState({ decisions: 2, evidence: 3, isIntegrated: false });
   const [showMergeTray, setShowMergeTray] = useState(true);
   const [meetingTitle, setMeetingTitle] = useState(meetingInfo.title);
-  const [projectName, setProjectName] = useState("TRACE PM MVP");
+  const [projectName, setProjectName] = useProjectName(params.projectId || "1");
+  const [decisionSummaries, setDecisionSummaries] = useState<DecisionSummary[]>(initialDecisionSummaries);
   const scrollRef = useRef<HTMLDivElement>(null);
   const logicFindingsRef = useRef<HTMLDivElement>(null);
   
   const filteredEvidenceDrops = evidenceDrops.filter(drop => drop.relevantFinding === selectedFinding);
+
+  const updateDecisionIntegration = (decisionId: string, status: IntegrationStatus) => {
+    setDecisionSummaries(prev => prev.map(d => 
+      d.id === decisionId ? { ...d, integrationStatus: status } : d
+    ));
+  };
+
+  const getMeetingIntegrationStatus = (): IntegrationStatus => {
+    const integratedCount = decisionSummaries.filter(d => d.integrationStatus === "integrated").length;
+    const totalCount = decisionSummaries.length;
+    if (integratedCount === totalCount) return "integrated";
+    if (integratedCount > 0) return "partial";
+    return "not";
+  };
 
   const handleIntegrate = () => {
     setPendingMerge(prev => ({ ...prev, isIntegrated: true }));
@@ -625,6 +589,9 @@ export default function MeetingDetail() {
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Lightbulb className="w-4 h-4 text-amber-500" />
                   Decisions
+                  <span className={`text-xs px-2 py-0.5 rounded ${integrationStatusConfig[getMeetingIntegrationStatus()].bgColor} ${integrationStatusConfig[getMeetingIntegrationStatus()].color}`}>
+                    {decisionSummaries.filter(d => d.integrationStatus === "integrated").length}/{decisionSummaries.length} 통합
+                  </span>
                   <Badge variant="secondary" className="ml-auto text-xs">
                     {decisionSummaries.length}
                   </Badge>
@@ -634,12 +601,44 @@ export default function MeetingDetail() {
                 <CardContent className="p-3">
                   <ul className="space-y-2">
                     {decisionSummaries.map(decision => (
-                      <li key={decision.id} className="flex items-start gap-2" data-testid={`decision-${decision.id}`}>
-                        <div className={`w-1.5 h-1.5 mt-1.5 rounded-full flex-shrink-0 ${
+                      <li key={decision.id} className="flex items-center gap-2" data-testid={`decision-${decision.id}`}>
+                        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                           decision.status === "confirmed" ? "bg-emerald-500" : 
                           decision.status === "deferred" ? "bg-amber-500" : "bg-slate-400"
                         }`} />
-                        <span className="text-sm text-foreground">{decision.title}</span>
+                        <span className="text-sm text-foreground flex-1">{decision.title}</span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button 
+                              className={`text-xs px-2 py-0.5 rounded flex items-center gap-1 ${integrationStatusConfig[decision.integrationStatus].bgColor} ${integrationStatusConfig[decision.integrationStatus].color}`}
+                              data-testid={`decision-status-${decision.id}`}
+                            >
+                              {decision.integrationStatus === "integrated" ? (
+                                <Check className="w-3 h-3" />
+                              ) : decision.integrationStatus === "partial" ? (
+                                <CircleDot className="w-3 h-3" />
+                              ) : (
+                                <Circle className="w-3 h-3" />
+                              )}
+                              <span>{integrationStatusConfig[decision.integrationStatus].label}</span>
+                              <ChevronDown className="w-3 h-3" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => updateDecisionIntegration(decision.id, "integrated")}>
+                              <Check className="w-4 h-4 mr-2 text-emerald-600" />
+                              통합됨
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => updateDecisionIntegration(decision.id, "partial")}>
+                              <CircleDot className="w-4 h-4 mr-2 text-amber-600" />
+                              부분 통합
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => updateDecisionIntegration(decision.id, "not")}>
+                              <Circle className="w-4 h-4 mr-2 text-slate-500" />
+                              미통합
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </li>
                     ))}
                   </ul>

@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
 import { useParams, useLocation } from "wouter";
+import { useProjectName } from "@/lib/project-context";
+import { InlineEditableText } from "@/components/inline-editable-text";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1001,12 +1003,18 @@ export default function ProjectOverview() {
   const hasResults = filteredDecisions.length > 0 || filteredMeetings.length > 0 || filteredGaps.length > 0;
   const hasActiveFilters = activeFilter !== null || statusFilter !== null;
   
+  const [projectName, setProjectName] = useProjectName(params.projectId || "1");
+  
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
-      <header className="flex-shrink-0 border-b border-border bg-white">
+      <header className="flex-shrink-0 border-b border-border bg-muted/30">
         <div className="px-6 py-4">
           <h1 className="text-xl font-semibold text-foreground" data-testid="text-project-title">
-            프로젝트 {params.projectId}
+            <InlineEditableText
+              value={projectName}
+              onSave={setProjectName}
+              testId="text-project-name"
+            />
           </h1>
           <p className="text-sm text-muted-foreground">Overview</p>
         </div>

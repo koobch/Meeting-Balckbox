@@ -29,16 +29,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useProject } from "@/lib/project-context";
 
 interface NavItem {
   href: string;
   label: string;
   icon: typeof LayoutDashboard;
-}
-
-interface Project {
-  id: string;
-  name: string;
 }
 
 interface RecentMeeting {
@@ -68,11 +64,6 @@ function saveRecentMeeting(meeting: Omit<RecentMeeting, "viewedAt">): void {
   window.dispatchEvent(new CustomEvent("recent-meetings-updated"));
 }
 
-const projects: Project[] = [
-  { id: "1", name: "TRACE PM MVP" },
-  { id: "2", name: "모바일 앱 리디자인" },
-  { id: "3", name: "B2B 플랫폼 구축" },
-];
 
 interface AppShellProps {
   projectId: string;
@@ -90,8 +81,7 @@ export function AppShell({ projectId, children }: AppShellProps) {
   const [meetingTitle, setMeetingTitle] = useState("");
   const [recentMeetings, setRecentMeetings] = useState<RecentMeeting[]>([]);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  const currentProject = projects.find(p => p.id === projectId) || projects[0];
+  const { projects, currentProject } = useProject();
 
   useEffect(() => {
     setRecentMeetings(getRecentMeetings());
@@ -186,7 +176,7 @@ export function AppShell({ projectId, children }: AppShellProps) {
                         <span className="text-primary-foreground text-sm font-bold">T</span>
                       </div>
                       <div className="flex-1 min-w-0 text-left">
-                        <p className="text-sm font-semibold text-foreground truncate">{currentProject.name}</p>
+                        <p className="text-sm font-semibold text-foreground truncate">{currentProject?.name || "프로젝트"}</p>
                         <p className="text-xs text-muted-foreground">프로젝트</p>
                       </div>
                       <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
