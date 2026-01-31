@@ -13,8 +13,18 @@ import {
   ListChecks,
   FileText,
   Bookmark,
-  MoreHorizontal
+  MoreHorizontal,
+  HelpCircle,
+  AlertTriangle,
+  Lightbulb
 } from "lucide-react";
+
+type LogicMarkType = "leap" | "missing" | "ambiguous";
+
+interface LogicMark {
+  type: LogicMarkType;
+  findingId: string;
+}
 
 interface TranscriptLine {
   id: string;
@@ -23,6 +33,17 @@ interface TranscriptLine {
   timestamp: string;
   text: string;
   isHighlight?: boolean;
+  logicMark?: LogicMark;
+}
+
+interface LogicFinding {
+  id: string;
+  type: LogicMarkType;
+  claim: string;
+  given: string;
+  gap: string;
+  suggestedQuestion: string;
+  relatedLineIds: string[];
 }
 
 interface Topic {
@@ -43,6 +64,54 @@ interface ParagraphSummary {
   timeRange: string;
   summary: string;
 }
+
+const logicFindings: LogicFinding[] = [
+  {
+    id: "lf-1",
+    type: "leap",
+    claim: "5분 내로 온보딩을 완료할 수 있어야 한다",
+    given: "사용자들이 기존 도구의 온보딩이 복잡하다고 느낌 (8명 중 6명)",
+    gap: "\"복잡하다\"는 피드백에서 \"5분\"이라는 구체적인 시간 목표가 어떻게 도출되었는지 근거가 명시되지 않았습니다.",
+    suggestedQuestion: "5분이라는 기준은 어떤 데이터나 벤치마크를 참고한 것인지 확인해 보시면 좋을 것 같습니다.",
+    relatedLineIds: ["t8"]
+  },
+  {
+    id: "lf-2",
+    type: "missing",
+    claim: "경쟁사 대비 저렴한 가격이 필요하다",
+    given: "인터뷰에서 가격에 대한 피드백이 있었음",
+    gap: "구체적으로 어떤 가격대를 기대하는지, 경쟁사 가격 대비 얼마나 저렴해야 하는지에 대한 정량적 근거가 부족합니다.",
+    suggestedQuestion: "사용자들이 언급한 \"저렴하다\"의 기준이 무엇이었는지 추가 확인이 필요해 보입니다.",
+    relatedLineIds: ["t17", "t18"]
+  },
+  {
+    id: "lf-3",
+    type: "ambiguous",
+    claim: "모바일 사용 비율 40%는 반응형 디자인이 필수임을 의미한다",
+    given: "인터뷰 대상자 중 40%가 모바일로 상태 확인을 한다고 응답",
+    gap: "8명 중 40%는 약 3명으로, 표본 크기가 작아 일반화하기에는 다소 조심스러울 수 있습니다. 또한 \"상태 확인\" 용도가 전체 사용 시나리오를 대표하는지 불분명합니다.",
+    suggestedQuestion: "모바일 사용 패턴에 대해 더 넓은 사용자 그룹에서 추가 검증을 고려해 보시면 어떨까요?",
+    relatedLineIds: ["t29", "t30"]
+  }
+];
+
+const logicMarkConfig: Record<LogicMarkType, { label: string; description: string; className: string }> = {
+  leap: { 
+    label: "leap", 
+    description: "논리적 도약",
+    className: "bg-slate-100 text-slate-500 border-slate-200" 
+  },
+  missing: { 
+    label: "missing", 
+    description: "근거 부족",
+    className: "bg-slate-100 text-slate-500 border-slate-200" 
+  },
+  ambiguous: { 
+    label: "ambiguous", 
+    description: "모호한 표현",
+    className: "bg-slate-100 text-slate-500 border-slate-200" 
+  }
+};
 
 const meetingInfo = {
   id: "m1",
@@ -77,7 +146,7 @@ const transcript: TranscriptLine[] = [
   { id: "t5", speaker: "김연구", speakerColor: speakerColors["김연구"], timestamp: "01:02", text: "주로 온보딩 과정에서의 진입장벽이 높다는 피드백이 많았습니다. 처음 시작할 때 뭘 해야 할지 모르겠다는 의견이요." },
   { id: "t6", speaker: "김연구", speakerColor: speakerColors["김연구"], timestamp: "01:18", text: "그리고 기능이 너무 많아서 정작 필요한 기능을 찾기 어렵다는 의견도 있었어요. 특히 Jira 같은 도구에서 그런 불만이 많았습니다." },
   { id: "t7", speaker: "박개발", speakerColor: speakerColors["박개발"], timestamp: "01:35", text: "저도 공감이 되네요. 저희 팀도 Jira 쓰면서 비슷한 경험이 있거든요. 설정하는 데만 시간이 너무 많이 들어요." },
-  { id: "t8", speaker: "최PM", speakerColor: speakerColors["최PM"], timestamp: "01:48", text: "그럼 우리 제품은 온보딩을 최대한 간소화하는 방향으로 가야겠네요. 5분 내로 시작할 수 있게." },
+  { id: "t8", speaker: "최PM", speakerColor: speakerColors["최PM"], timestamp: "01:48", text: "그럼 우리 제품은 온보딩을 최대한 간소화하는 방향으로 가야겠네요. 5분 내로 시작할 수 있게.", logicMark: { type: "leap", findingId: "lf-1" } },
   { id: "t9", speaker: "이디자인", speakerColor: speakerColors["이디자인"], timestamp: "02:05", text: "네, 저도 그게 좋을 것 같아요. 빈 캔버스로 시작하는 게 아니라 템플릿을 제공하면 어떨까요?" },
   { id: "t10", speaker: "김연구", speakerColor: speakerColors["김연구"], timestamp: "02:20", text: "맞아요. 실제로 템플릿에 대한 니즈도 인터뷰에서 나왔습니다. 처음부터 다 만드는 게 부담스럽다고요." },
   { id: "t11", speaker: "최PM", speakerColor: speakerColors["최PM"], timestamp: "02:38", text: "좋습니다. 그러면 MVP에 기본 템플릿 3-5개 정도 포함하는 걸로 하죠. 이디자인님 가능하실까요?" },
@@ -86,8 +155,8 @@ const transcript: TranscriptLine[] = [
   { id: "t14", speaker: "박개발", speakerColor: speakerColors["박개발"], timestamp: "03:28", text: "실시간 편집은 기술적으로 조금 도전적인 부분이 있어요. MVP에 넣으려면 일정 조율이 필요할 것 같은데..." },
   { id: "t15", speaker: "최PM", speakerColor: speakerColors["최PM"], timestamp: "03:45", text: "그럼 실시간 편집은 1.1 버전으로 미루고, 코멘트 기능만 MVP에 넣는 건 어떨까요?" },
   { id: "t16", speaker: "박개발", speakerColor: speakerColors["박개발"], timestamp: "04:00", text: "코멘트 기능은 괜찮을 것 같아요. 기본적인 CRUD라서요." },
-  { id: "t17", speaker: "김연구", speakerColor: speakerColors["김연구"], timestamp: "04:12", text: "그리고 세 번째로 가격에 대한 피드백도 있었는데요, 경쟁사 대비 저렴하면 좋겠다는 의견이 있었습니다." },
-  { id: "t18", speaker: "최PM", speakerColor: speakerColors["최PM"], timestamp: "04:28", text: "가격 부분은 조금 더 고민이 필요할 것 같아요. 일단 경쟁사 가격 분석부터 해봐야겠네요." },
+  { id: "t17", speaker: "김연구", speakerColor: speakerColors["김연구"], timestamp: "04:12", text: "그리고 세 번째로 가격에 대한 피드백도 있었는데요, 경쟁사 대비 저렴하면 좋겠다는 의견이 있었습니다.", logicMark: { type: "missing", findingId: "lf-2" } },
+  { id: "t18", speaker: "최PM", speakerColor: speakerColors["최PM"], timestamp: "04:28", text: "가격 부분은 조금 더 고민이 필요할 것 같아요. 일단 경쟁사 가격 분석부터 해봐야겠네요.", logicMark: { type: "missing", findingId: "lf-2" } },
   { id: "t19", speaker: "김연구", speakerColor: speakerColors["김연구"], timestamp: "04:45", text: "네, 제가 경쟁사 가격 조사 자료 정리해서 공유드릴게요." },
   { id: "t20", speaker: "이디자인", speakerColor: speakerColors["이디자인"], timestamp: "05:02", text: "혹시 UI에 대한 직접적인 피드백도 있었나요? 디자인 개선 포인트가 있다면 알고 싶어요." },
   { id: "t21", speaker: "김연구", speakerColor: speakerColors["김연구"], timestamp: "05:18", text: "네, 몇 가지 있었어요. 일단 다크모드 지원 요청이 가장 많았고요." },
@@ -98,8 +167,8 @@ const transcript: TranscriptLine[] = [
   { id: "t26", speaker: "최PM", speakerColor: speakerColors["최PM"], timestamp: "06:30", text: "좋아요. 그러면 대시보드 시각화도 MVP 스코프에 포함하죠.", isHighlight: true },
   { id: "t27", speaker: "김연구", speakerColor: speakerColors["김연구"], timestamp: "06:45", text: "한 가지 더 중요한 발견이 있었는데요, 모바일에서 사용하는 비율이 예상보다 높았어요." },
   { id: "t28", speaker: "최PM", speakerColor: speakerColors["최PM"], timestamp: "07:00", text: "모바일이요? 어느 정도 비율인가요?" },
-  { id: "t29", speaker: "김연구", speakerColor: speakerColors["김연구"], timestamp: "07:12", text: "인터뷰 대상자 중 약 40%가 이동 중에 모바일로 확인한다고 했어요. 주로 상태 확인 용도로요." },
-  { id: "t30", speaker: "이디자인", speakerColor: speakerColors["이디자인"], timestamp: "07:28", text: "그럼 반응형 디자인은 필수겠네요. 모바일 퍼스트로 갈 필요까지는 없겠지만..." },
+  { id: "t29", speaker: "김연구", speakerColor: speakerColors["김연구"], timestamp: "07:12", text: "인터뷰 대상자 중 약 40%가 이동 중에 모바일로 확인한다고 했어요. 주로 상태 확인 용도로요.", logicMark: { type: "ambiguous", findingId: "lf-3" } },
+  { id: "t30", speaker: "이디자인", speakerColor: speakerColors["이디자인"], timestamp: "07:28", text: "그럼 반응형 디자인은 필수겠네요. 모바일 퍼스트로 갈 필요까지는 없겠지만...", logicMark: { type: "ambiguous", findingId: "lf-3" } },
   { id: "t31", speaker: "박개발", speakerColor: speakerColors["박개발"], timestamp: "07:42", text: "Tailwind 쓰고 있어서 반응형은 어렵지 않을 거예요." },
   { id: "t32", speaker: "최PM", speakerColor: speakerColors["최PM"], timestamp: "07:55", text: "네, 반응형은 기본으로 하고요. 혹시 다른 중요한 피드백이 있었나요?" },
   { id: "t33", speaker: "김연구", speakerColor: speakerColors["김연구"], timestamp: "08:10", text: "알림 기능에 대한 니즈도 있었어요. 중요한 업데이트가 있을 때 알려주면 좋겠다고요." },
@@ -152,7 +221,41 @@ const paragraphSummaries: ParagraphSummary[] = [
   { id: "ps-5", timeRange: "09:00 - 12:35", summary: "MVP 스코프 확정: 온보딩, 템플릿, 코멘트, 시각화, 반응형, 다크모드, 이메일 알림. 2월 10일 개발 완료, 15일 출시 목표." }
 ];
 
-function TranscriptItem({ line, isActive }: { line: TranscriptLine; isActive: boolean }) {
+function LogicMarkBadge({ 
+  mark, 
+  onClick 
+}: { 
+  mark: LogicMark; 
+  onClick: () => void;
+}) {
+  const config = logicMarkConfig[mark.type];
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded border ${config.className} hover:opacity-80 transition-opacity cursor-pointer`}
+      title={config.description}
+      data-testid={`logic-mark-${mark.findingId}`}
+    >
+      {mark.type === "leap" && <AlertTriangle className="w-3 h-3" />}
+      {mark.type === "missing" && <HelpCircle className="w-3 h-3" />}
+      {mark.type === "ambiguous" && <Lightbulb className="w-3 h-3" />}
+      <span>{config.label}</span>
+    </button>
+  );
+}
+
+function TranscriptItem({ 
+  line, 
+  isActive,
+  onLogicMarkClick
+}: { 
+  line: TranscriptLine; 
+  isActive: boolean;
+  onLogicMarkClick?: (findingId: string) => void;
+}) {
   return (
     <div 
       className={`group flex gap-3 py-3 px-4 rounded-md transition-all ${
@@ -166,13 +269,19 @@ function TranscriptItem({ line, isActive }: { line: TranscriptLine; isActive: bo
         </div>
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
           <span className="text-sm font-medium text-foreground">{line.speaker}</span>
           <span className="text-xs text-muted-foreground">{line.timestamp}</span>
           {line.isHighlight && (
             <Badge variant="secondary" className="text-xs py-0 px-1.5 bg-primary/10 text-primary">
               핵심
             </Badge>
+          )}
+          {line.logicMark && (
+            <LogicMarkBadge 
+              mark={line.logicMark} 
+              onClick={() => onLogicMarkClick?.(line.logicMark!.findingId)}
+            />
           )}
         </div>
         <p className="text-sm text-foreground leading-relaxed">{line.text}</p>
@@ -186,11 +295,71 @@ function TranscriptItem({ line, isActive }: { line: TranscriptLine; isActive: bo
   );
 }
 
+function LogicFindingCard({ 
+  finding, 
+  isHighlighted,
+  onScrollToLine
+}: { 
+  finding: LogicFinding; 
+  isHighlighted: boolean;
+  onScrollToLine: (lineId: string) => void;
+}) {
+  const config = logicMarkConfig[finding.type];
+  
+  return (
+    <div 
+      className={`p-3 rounded-md border transition-all ${
+        isHighlighted 
+          ? "border-primary bg-primary/5 ring-1 ring-primary/20" 
+          : "border-border hover:border-border/80"
+      }`}
+      data-testid={`logic-finding-${finding.id}`}
+    >
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded border ${config.className}`}>
+          {finding.type === "leap" && <AlertTriangle className="w-3 h-3" />}
+          {finding.type === "missing" && <HelpCircle className="w-3 h-3" />}
+          {finding.type === "ambiguous" && <Lightbulb className="w-3 h-3" />}
+          <span>{config.description}</span>
+        </div>
+        <button
+          onClick={() => onScrollToLine(finding.relatedLineIds[0])}
+          className="text-xs text-muted-foreground hover:text-primary transition-colors"
+          data-testid={`goto-line-${finding.id}`}
+        >
+          발언 보기
+        </button>
+      </div>
+      
+      <div className="space-y-2 text-sm">
+        <div>
+          <p className="text-xs text-muted-foreground mb-0.5">주장</p>
+          <p className="text-foreground">{finding.claim}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground mb-0.5">근거</p>
+          <p className="text-foreground">{finding.given}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground mb-0.5">검토 포인트</p>
+          <p className="text-muted-foreground italic">{finding.gap}</p>
+        </div>
+        <div className="pt-2 border-t border-border/50">
+          <p className="text-xs text-muted-foreground mb-0.5">제안 질문</p>
+          <p className="text-primary/80 text-sm">&ldquo;{finding.suggestedQuestion}&rdquo;</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MeetingDetail() {
   const params = useParams<{ projectId: string; meetingId: string }>();
   const [activeLine, setActiveLine] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [highlightedFinding, setHighlightedFinding] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const logicFindingsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isPlaying) {
@@ -212,6 +381,19 @@ export default function MeetingDetail() {
       const element = document.querySelector(`[data-testid="transcript-line-${line.id}"]`);
       element?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
+  };
+
+  const scrollToLogicFinding = (findingId: string) => {
+    setHighlightedFinding(findingId);
+    const element = document.querySelector(`[data-testid="logic-finding-${findingId}"]`);
+    element?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => setHighlightedFinding(null), 3000);
+  };
+
+  const scrollToTranscriptLine = (lineId: string) => {
+    setActiveLine(lineId);
+    const element = document.querySelector(`[data-testid="transcript-line-${lineId}"]`);
+    element?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
   return (
@@ -298,6 +480,7 @@ export default function MeetingDetail() {
                       key={line.id} 
                       line={line} 
                       isActive={activeLine === line.id}
+                      onLogicMarkClick={scrollToLogicFinding}
                     />
                   ))}
                 </div>
@@ -374,7 +557,7 @@ export default function MeetingDetail() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <ScrollArea className="h-64">
+                <ScrollArea className="h-48">
                   <ul className="divide-y divide-border/50">
                     {paragraphSummaries.map(summary => (
                       <li key={summary.id} className="p-3" data-testid={`summary-${summary.id}`}>
@@ -385,6 +568,35 @@ export default function MeetingDetail() {
                       </li>
                     ))}
                   </ul>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+
+            <Card ref={logicFindingsRef} data-testid="section-logic-findings">
+              <CardHeader className="py-3 px-4 border-b border-border">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <HelpCircle className="w-4 h-4 text-slate-500" />
+                  Logic Findings
+                  <Badge variant="secondary" className="ml-auto text-xs bg-slate-100 text-slate-600">
+                    {logicFindings.length}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <ScrollArea className="h-80">
+                  <div className="p-3 space-y-3">
+                    <p className="text-xs text-muted-foreground mb-2">
+                      논의 내용에서 검토가 필요할 수 있는 부분을 참고용으로 정리했습니다.
+                    </p>
+                    {logicFindings.map(finding => (
+                      <LogicFindingCard
+                        key={finding.id}
+                        finding={finding}
+                        isHighlighted={highlightedFinding === finding.id}
+                        onScrollToLine={scrollToTranscriptLine}
+                      />
+                    ))}
+                  </div>
                 </ScrollArea>
               </CardContent>
             </Card>
