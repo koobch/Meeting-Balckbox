@@ -259,7 +259,19 @@ export default function MeetingDetail() {
     console.log('[Transcript] Successfully parsed lines:', parsed.length);
     console.log('[Transcript] Sample parsed:', parsed.slice(0, 2));
 
-    return parsed;
+    // Merge consecutive lines from the same speaker
+    const merged: TranscriptLine[] = [];
+    parsed.forEach((line) => {
+      const lastMerged = merged[merged.length - 1];
+      if (lastMerged && lastMerged.speaker === line.speaker &&
+        (line.speaker === "Unknown" || lastMerged.timestamp === line.timestamp)) {
+        lastMerged.text += ' ' + line.text;
+      } else {
+        merged.push({ ...line });
+      }
+    });
+    console.log('[Transcript] After merging:', merged.length, 'lines');
+    return merged;
   };
 
   const fetchDetails = useCallback(async () => {
