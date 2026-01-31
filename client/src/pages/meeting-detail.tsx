@@ -55,6 +55,11 @@ interface TranscriptLine {
   logicMark?: LogicMark;
 }
 
+interface ResearchResult {
+  summary: string;
+  sources: { title: string; url: string }[];
+}
+
 interface LogicFinding {
   id: string;
   type: LogicMarkType;
@@ -64,6 +69,31 @@ interface LogicFinding {
   suggestedQuestion: string;
   relatedLineIds: string[];
 }
+
+type FindingResearchState = "idle" | "loading" | "done" | "error";
+
+const mockResearchResults: Record<string, ResearchResult> = {
+  "lf-1": {
+    summary: "SaaS 온보딩 벤치마크에 따르면, 복잡한 도구의 경우 평균 온보딩 시간은 7-10분이며, 단순 도구는 3-5분입니다. 5분 목표는 업계 표준에 부합합니다.",
+    sources: [
+      { title: "SaaS Onboarding Benchmark Report 2024", url: "https://userpilot.com/blog/saas-onboarding-benchmarks" },
+      { title: "Product-Led Growth Metrics", url: "https://openviewpartners.com/plg-metrics" }
+    ]
+  },
+  "lf-2": {
+    summary: "경쟁사 분석 결과, 유사 PM 도구의 월간 구독료는 $10-25 범위입니다. 중소기업 타겟 시 $15 이하 가격이 경쟁력 있다는 연구 결과가 있습니다.",
+    sources: [
+      { title: "2024 SaaS Pricing Strategy Report", url: "https://openviewpartners.com/pricing-2024" }
+    ]
+  },
+  "lf-3": {
+    summary: "대규모 사용자 조사(n=1,200)에서 PM 도구 모바일 사용률은 35-45%로 확인되었으며, 8명 표본의 40%는 통계적으로 유의미한 범위 내에 있습니다.",
+    sources: [
+      { title: "Mobile Usage in PM Tools Survey", url: "https://productplan.com/research/mobile-usage-2024" },
+      { title: "Enterprise Software Mobile Trends", url: "https://forrester.com/mobile-enterprise-2024" }
+    ]
+  }
+};
 
 interface Topic {
   id: string;
@@ -228,38 +258,6 @@ const paragraphSummaries: ParagraphSummary[] = [
   { id: "ps-3", timeRange: "04:00 - 06:00", summary: "협업 기능 중 실시간 편집은 1.1 버전으로 연기, 코멘트 기능만 MVP 포함. 가격 정책은 추가 조사 필요." },
   { id: "ps-4", timeRange: "06:00 - 09:00", summary: "UI 개선점: 다크모드, 대시보드 시각화 추가. 모바일 사용률 40%로 반응형 디자인 필수. 이메일 알림 MVP 포함." },
   { id: "ps-5", timeRange: "09:00 - 12:35", summary: "MVP 스코프 확정: 온보딩, 템플릿, 코멘트, 시각화, 반응형, 다크모드, 이메일 알림. 2월 10일 개발 완료, 15일 출시 목표." }
-];
-
-interface EvidenceDrop {
-  id: string;
-  title: string;
-  summary: string;
-  source: string;
-  relevantFinding: string;
-}
-
-const evidenceDrops: EvidenceDrop[] = [
-  {
-    id: "ed-1",
-    title: "Nielsen Norman Group 온보딩 연구",
-    summary: "SaaS 온보딩 황금 시간 3-5분. 5분 초과 시 이탈률 급증.",
-    source: "nngroup.com",
-    relevantFinding: "lf-1"
-  },
-  {
-    id: "ed-2",
-    title: "2024 SaaS 가격 전략 보고서",
-    summary: "경쟁사 대비 가격 책정 전략 분석. 중소기업 타겟 시 10-20% 저렴한 가격 권장.",
-    source: "OpenView Partners",
-    relevantFinding: "lf-2"
-  },
-  {
-    id: "ed-3",
-    title: "모바일 사용 패턴 대규모 조사",
-    summary: "PM 도구 사용자 1,200명 대상 조사. 모바일 사용률 35-45% 확인.",
-    source: "ProductPlan",
-    relevantFinding: "lf-3"
-  }
 ];
 
 type IntegrationStatus = "integrated" | "partial" | "not";
@@ -439,7 +437,6 @@ export default function MeetingDetail() {
   const logicFindingsRef = useRef<HTMLDivElement>(null);
   
   const [selectedDecisions, setSelectedDecisions] = useState<Set<string>>(new Set());
-  const [selectedEvidence, setSelectedEvidence] = useState<Set<string>>(new Set());
   const [selectedActions, setSelectedActions] = useState<Set<string>>(new Set());
   const [commitSuccess, setCommitSuccess] = useState(false);
   
@@ -451,9 +448,8 @@ export default function MeetingDetail() {
   const [newDecisionText, setNewDecisionText] = useState("");
   const [newActionText, setNewActionText] = useState("");
   
-  type ResearchState = "idle" | "loading" | "done" | "error";
-  const [researchState, setResearchState] = useState<ResearchState>("idle");
-  const [loadingDots, setLoadingDots] = useState(0);
+  const [findingResearchStates, setFindingResearchStates] = useState<Record<string, FindingResearchState>>({});
+  const [findingLoadingDots, setFindingLoadingDots] = useState<Record<string, number>>({});
   
   const speakerMappingsKey = `trace-pm-speaker-mappings-${meetingId}`;
   const [speakerMappings, setSpeakerMappings] = useState<Record<string, string>>(() => {
@@ -478,19 +474,8 @@ export default function MeetingDetail() {
   
   const { addToMemory, isItemIntegrated, getIntegrationStatus } = useProjectMemory();
   
-  const filteredEvidenceDrops = evidenceDrops.filter(drop => drop.relevantFinding === selectedFinding);
-
   const toggleDecisionSelection = (id: string) => {
     setSelectedDecisions(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleEvidenceSelection = (id: string) => {
-    setSelectedEvidence(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -509,7 +494,6 @@ export default function MeetingDetail() {
 
   const clearAllSelections = () => {
     setSelectedDecisions(new Set());
-    setSelectedEvidence(new Set());
     setSelectedActions(new Set());
     setCommitSuccess(false);
   };
@@ -564,11 +548,11 @@ export default function MeetingDetail() {
     }
   };
 
-  const startResearch = () => {
-    setResearchState("loading");
-    setLoadingDots(0);
+  const startFindingResearch = (findingId: string) => {
+    setFindingResearchStates(prev => ({ ...prev, [findingId]: "loading" }));
+    setFindingLoadingDots(prev => ({ ...prev, [findingId]: 0 }));
     setTimeout(() => {
-      setResearchState("done");
+      setFindingResearchStates(prev => ({ ...prev, [findingId]: "done" }));
     }, 2500);
   };
 
@@ -590,15 +574,20 @@ export default function MeetingDetail() {
   };
 
   useEffect(() => {
-    if (researchState === "loading") {
+    const loadingFindings = Object.entries(findingResearchStates).filter(([_, state]) => state === "loading");
+    if (loadingFindings.length > 0) {
       const interval = setInterval(() => {
-        setLoadingDots(prev => (prev + 1) % 4);
+        setFindingLoadingDots(prev => {
+          const updated = { ...prev };
+          loadingFindings.forEach(([id]) => {
+            updated[id] = ((prev[id] || 0) + 1) % 4;
+          });
+          return updated;
+        });
       }, 400);
       return () => clearInterval(interval);
-    } else {
-      setLoadingDots(0);
     }
-  }, [researchState]);
+  }, [findingResearchStates]);
 
   const decisionsToIntegrate = decisionsSelectMode 
     ? decisionSummariesState.filter(d => !isItemIntegrated(projectId, d.id)).length 
@@ -606,7 +595,7 @@ export default function MeetingDetail() {
   const actionsToIntegrate = actionsSelectMode 
     ? actionItemsState.filter(a => !isItemIntegrated(projectId, a.id)).length 
     : 0;
-  const totalSelectedCount = decisionsToIntegrate + selectedEvidence.size + actionsToIntegrate;
+  const totalSelectedCount = decisionsToIntegrate + actionsToIntegrate;
 
   const handleCommitToMemory = () => {
     const items: MemoryItem[] = [];
@@ -627,21 +616,6 @@ export default function MeetingDetail() {
       });
     }
 
-    selectedEvidence.forEach(id => {
-      const evidence = evidenceDrops.find(e => e.id === id);
-      if (evidence) {
-        items.push({
-          id: `mem-${id}-${Date.now()}`,
-          type: "evidence",
-          title: evidence.title,
-          content: evidence.summary,
-          sourceId: id,
-          sourceMeetingId: meetingId,
-          integratedAt: now
-        });
-      }
-    });
-
     if (actionsSelectMode) {
       actionItemsState.forEach(action => {
         if (!isItemIntegrated(projectId, action.id)) {
@@ -661,7 +635,6 @@ export default function MeetingDetail() {
       addToMemory(projectId, items);
       setCommitSuccess(true);
       setSelectedDecisions(new Set());
-      setSelectedEvidence(new Set());
       setSelectedActions(new Set());
       setDecisionsSelectMode(false);
       setActionsSelectMode(false);
@@ -1005,6 +978,9 @@ export default function MeetingDetail() {
                         {(() => {
                           const finding = logicFindings[selectedFindingIndex];
                           if (!finding) return null;
+                          const researchState = findingResearchStates[finding.id] || "idle";
+                          const loadingDots = findingLoadingDots[finding.id] || 0;
+                          const researchResult = mockResearchResults[finding.id];
                           return (
                             <div 
                               className="p-3 rounded-md border border-border border-dashed transition-colors"
@@ -1021,8 +997,9 @@ export default function MeetingDetail() {
                                   {logicMarkConfig[finding.type].description}
                                 </Badge>
                               </div>
-                              <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{finding.gap}</p>
-                              <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{finding.gap}</p>
+                              
+                              <div className="flex items-center gap-2 flex-wrap mb-3">
                                 <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200 text-xs">
                                   <MessageSquare className="w-3 h-3 mr-1" />
                                   {finding.relatedLineIds.length}개 관련 발언
@@ -1035,6 +1012,65 @@ export default function MeetingDetail() {
                                 >
                                   발언 보기
                                 </Button>
+                              </div>
+
+                              {/* Research Section */}
+                              <div className="pt-2 border-t border-border/50">
+                                {researchState === "idle" && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => startFindingResearch(finding.id)}
+                                    className="w-full"
+                                    data-testid={`button-research-${finding.id}`}
+                                  >
+                                    <Inbox className="w-3.5 h-3.5 mr-1.5 text-violet-600" />
+                                    리서치 실행
+                                  </Button>
+                                )}
+                                {researchState === "loading" && (
+                                  <div className="text-center py-2">
+                                    <p className="text-xs text-muted-foreground" data-testid={`text-research-loading-${finding.id}`}>
+                                      리서치중{".".repeat(loadingDots)}
+                                    </p>
+                                  </div>
+                                )}
+                                {researchState === "done" && researchResult && (
+                                  <div className="space-y-2" data-testid={`research-result-${finding.id}`}>
+                                    <div className="flex items-start gap-1.5">
+                                      <Inbox className="w-3.5 h-3.5 text-violet-600 mt-0.5 flex-shrink-0" />
+                                      <p className="text-xs text-foreground leading-relaxed">{researchResult.summary}</p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5 pl-5">
+                                      {researchResult.sources.map((source, idx) => (
+                                        <a
+                                          key={idx}
+                                          href={source.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-violet-50 text-violet-700 border border-violet-200 hover-elevate"
+                                          data-testid={`research-source-${finding.id}-${idx}`}
+                                        >
+                                          <ExternalLink className="w-3 h-3" />
+                                          {source.title}
+                                        </a>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {researchState === "error" && (
+                                  <div className="text-center py-2">
+                                    <p className="text-xs text-destructive mb-2">리서치에 실패했습니다.</p>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => startFindingResearch(finding.id)}
+                                      data-testid={`button-retry-research-${finding.id}`}
+                                    >
+                                      다시 실행
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           );
@@ -1067,114 +1103,6 @@ export default function MeetingDetail() {
                       </div>
                     )}
                   </div>
-                )}
-              </CardContent>
-              {selectedFinding && (
-                <div className="absolute left-1/2 -bottom-1 -translate-x-1/2 flex flex-col items-center" data-testid="connection-line">
-                  <div className="w-px h-1 bg-gradient-to-b from-primary/60 to-violet-500/60" />
-                </div>
-              )}
-            </Card>
-
-            <Card data-testid="section-evidence-drops" className="relative">
-              {selectedFinding && (
-                <div className="absolute left-1/2 -top-1 -translate-x-1/2 flex flex-col items-center">
-                  <div className="w-px h-1 bg-gradient-to-b from-primary/60 to-violet-500/60" />
-                </div>
-              )}
-              <CardHeader className="py-3 px-4 border-b border-border">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Inbox className="w-4 h-4 text-violet-600" />
-                  보완 리서치
-                  <Badge variant="secondary" className="ml-auto text-xs bg-violet-100 text-violet-600">
-                    {filteredEvidenceDrops.length}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3">
-                {researchState === "idle" && (
-                  <div className="text-center py-6">
-                    <p className="text-sm text-muted-foreground mb-3">
-                      논리 확인을 위해 관련 내용을 리서치 하시겠습니까?
-                    </p>
-                    <Button 
-                      size="sm" 
-                      onClick={startResearch}
-                      data-testid="button-start-research"
-                    >
-                      실행
-                    </Button>
-                  </div>
-                )}
-                {researchState === "loading" && (
-                  <div className="text-center py-6">
-                    <p className="text-sm text-muted-foreground" data-testid="text-research-loading">
-                      리서치중{".".repeat(loadingDots)}
-                    </p>
-                  </div>
-                )}
-                {researchState === "error" && (
-                  <div className="text-center py-6">
-                    <p className="text-sm text-destructive mb-3">
-                      리서치에 실패했습니다. 다시 시도해주세요.
-                    </p>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={startResearch}
-                      data-testid="button-retry-research"
-                    >
-                      다시 실행
-                    </Button>
-                  </div>
-                )}
-                {researchState === "done" && (
-                  filteredEvidenceDrops.length > 0 ? (
-                    <ul className="space-y-2">
-                      {filteredEvidenceDrops.map(drop => {
-                        const itemStatus = getItemStatus(drop.id);
-                        const isSelected = selectedEvidence.has(drop.id);
-                        const isAlreadyIntegrated = itemStatus === "integrated";
-                        return (
-                          <li 
-                            key={drop.id} 
-                            className="group p-2 rounded-md hover:bg-muted/50 transition-colors border border-transparent hover:border-border"
-                            data-testid={`evidence-drop-${drop.id}`}
-                          >
-                            <div className="flex items-start gap-2">
-                              <Checkbox
-                                checked={isSelected}
-                                onCheckedChange={() => toggleEvidenceSelection(drop.id)}
-                                disabled={isAlreadyIntegrated}
-                                className="mt-0.5"
-                                data-testid={`evidence-checkbox-${drop.id}`}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between gap-2">
-                                  <h4 className={`text-sm font-medium group-hover:text-primary transition-colors ${isAlreadyIntegrated ? "text-muted-foreground" : "text-foreground"}`}>
-                                    {drop.title}
-                                  </h4>
-                                  {isAlreadyIntegrated ? (
-                                    <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 flex items-center gap-0.5 flex-shrink-0">
-                                      <Check className="w-3 h-3" />
-                                    </span>
-                                  ) : (
-                                    <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
-                                  )}
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{drop.summary}</p>
-                                <span className="text-xs text-primary mt-1 inline-block">{drop.source}</span>
-                              </div>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <p className="text-xs text-muted-foreground text-center py-4">
-                      관련 근거를 찾지 못했습니다.
-                    </p>
-                  )
                 )}
               </CardContent>
             </Card>
@@ -1361,9 +1289,8 @@ export default function MeetingDetail() {
                     <div>
                       <p className="text-sm font-medium text-foreground">
                         선택됨 {totalSelectedCount}개
-                        {selectedDecisions.size > 0 && `: 결정 ${selectedDecisions.size}`}
-                        {selectedEvidence.size > 0 && `, 근거 ${selectedEvidence.size}`}
-                        {selectedActions.size > 0 && `, 할일 ${selectedActions.size}`}
+                        {decisionsToIntegrate > 0 && `: 결정 ${decisionsToIntegrate}`}
+                        {actionsToIntegrate > 0 && `, 할일 ${actionsToIntegrate}`}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         선택한 항목을 프로젝트 기억에 통합합니다
