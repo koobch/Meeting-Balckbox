@@ -395,16 +395,92 @@ function LogicFindingCard({
   );
 }
 
+function InlineEditableText({
+  value,
+  onSave,
+  className,
+  testId
+}: {
+  value: string;
+  onSave: (newValue: string) => void;
+  className?: string;
+  testId?: string;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleSave = () => {
+    if (editValue.trim() && editValue !== value) {
+      onSave(editValue.trim());
+    } else {
+      setEditValue(value);
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditValue(value);
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSave();
+    } else if (e.key === "Escape") {
+      handleCancel();
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        value={editValue}
+        onChange={(e) => setEditValue(e.target.value)}
+        onBlur={handleSave}
+        onKeyDown={handleKeyDown}
+        className={`bg-transparent border-b border-primary outline-none ${className}`}
+        data-testid={`${testId}-input`}
+      />
+    );
+  }
+
+  return (
+    <span
+      onDoubleClick={() => setIsEditing(true)}
+      className={`cursor-text hover:bg-muted/50 rounded px-1 -mx-1 transition-colors ${className}`}
+      title="더블클릭하여 편집"
+      data-testid={testId}
+    >
+      {value}
+    </span>
+  );
+}
+
 export default function MeetingDetail() {
   const params = useParams<{ projectId: string; meetingId: string }>();
   const [activeLine, setActiveLine] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [highlightedFinding, setHighlightedFinding] = useState<string | null>(null);
+  const [selectedFinding, setSelectedFinding] = useState<string>(logicFindings[0]?.id || "");
   const [role, setRole] = useState<"lead" | "member">("lead");
   const [pendingMerge, setPendingMerge] = useState({ decisions: 2, evidence: 3, isIntegrated: false });
   const [showMergeTray, setShowMergeTray] = useState(true);
+  const [meetingTitle, setMeetingTitle] = useState(meetingInfo.title);
+  const [projectName, setProjectName] = useState("TRACE PM MVP");
   const scrollRef = useRef<HTMLDivElement>(null);
   const logicFindingsRef = useRef<HTMLDivElement>(null);
+  
+  const filteredEvidenceDrops = evidenceDrops.filter(drop => drop.relevantFinding === selectedFinding);
 
   const handleIntegrate = () => {
     setPendingMerge(prev => ({ ...prev, isIntegrated: true }));
@@ -464,8 +540,23 @@ export default function MeetingDetail() {
                 <ChevronLeft className="w-5 h-5 text-muted-foreground" />
               </Link>
               <div>
-                <h1 className="text-lg font-semibold text-foreground" data-testid="text-meeting-title">
-                  {meetingInfo.title}
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-xs text-muted-foreground">
+                    <InlineEditableText
+                      value={projectName}
+                      onSave={setProjectName}
+                      className="text-xs"
+                      testId="text-project-name"
+                    />
+                  </span>
+                  <span className="text-xs text-muted-foreground">/</span>
+                </div>
+                <h1 className="text-lg font-semibold text-foreground">
+                  <InlineEditableText
+                    value={meetingTitle}
+                    onSave={setMeetingTitle}
+                    testId="text-meeting-title"
+                  />
                 </h1>
                 <div className="flex items-center gap-3 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1">
@@ -516,74 +607,76 @@ export default function MeetingDetail() {
       </header>
 
       <div className="flex-1 overflow-auto px-6 py-4 flex flex-col">
-        <section className="mb-4 grid grid-cols-3 gap-4 flex-shrink-0" data-testid="section-summary">
-          <Card data-testid="summary-decisions">
-            <CardHeader className="py-3 px-4 border-b border-border">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Lightbulb className="w-4 h-4 text-amber-500" />
-                Decisions
-                <Badge variant="secondary" className="ml-auto text-xs">
-                  {decisionSummaries.length}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <ScrollArea className="h-56">
-              <CardContent className="p-3">
-                <ul className="space-y-2">
-                  {decisionSummaries.map(decision => (
-                    <li key={decision.id} className="flex items-start gap-2" data-testid={`decision-${decision.id}`}>
-                      <div className={`w-1.5 h-1.5 mt-1.5 rounded-full flex-shrink-0 ${
-                        decision.status === "confirmed" ? "bg-emerald-500" : 
-                        decision.status === "deferred" ? "bg-amber-500" : "bg-slate-400"
-                      }`} />
-                      <span className="text-sm text-foreground">{decision.title}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </ScrollArea>
-          </Card>
+        <section className="mb-4 flex-shrink-0 space-y-4" data-testid="section-summary">
+          <div className="grid grid-cols-2 gap-4">
+            <Card data-testid="summary-decisions">
+              <CardHeader className="py-3 px-4 border-b border-border">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Lightbulb className="w-4 h-4 text-amber-500" />
+                  Decisions
+                  <Badge variant="secondary" className="ml-auto text-xs">
+                    {decisionSummaries.length}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <ScrollArea className="h-40">
+                <CardContent className="p-3">
+                  <ul className="space-y-2">
+                    {decisionSummaries.map(decision => (
+                      <li key={decision.id} className="flex items-start gap-2" data-testid={`decision-${decision.id}`}>
+                        <div className={`w-1.5 h-1.5 mt-1.5 rounded-full flex-shrink-0 ${
+                          decision.status === "confirmed" ? "bg-emerald-500" : 
+                          decision.status === "deferred" ? "bg-amber-500" : "bg-slate-400"
+                        }`} />
+                        <span className="text-sm text-foreground">{decision.title}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </ScrollArea>
+            </Card>
 
-          <Card data-testid="summary-action-items">
-            <CardHeader className="py-3 px-4 border-b border-border">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <ListChecks className="w-4 h-4 text-emerald-500" />
-                다음 할 일
-                <Badge variant="secondary" className="ml-auto text-xs">
-                  {actionItemsData.filter(a => a.completed).length}/{actionItemsData.length}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <ScrollArea className="h-56">
-              <CardContent className="p-3">
-                <ul className="space-y-2">
-                  {actionItemsData.map(item => (
-                    <li key={item.id} className="flex items-start gap-2" data-testid={`action-summary-${item.id}`}>
-                      <div className={`w-4 h-4 mt-0.5 rounded border flex-shrink-0 flex items-center justify-center ${
-                        item.completed ? "bg-emerald-500 border-emerald-500" : "border-border"
-                      }`}>
-                        {item.completed && (
-                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm ${item.completed ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                          {item.task}
-                        </p>
-                        <span className="text-xs text-muted-foreground">{item.assignee}</span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </ScrollArea>
-          </Card>
+            <Card data-testid="summary-action-items">
+              <CardHeader className="py-3 px-4 border-b border-border">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <ListChecks className="w-4 h-4 text-emerald-500" />
+                  다음 할 일
+                  <Badge variant="secondary" className="ml-auto text-xs">
+                    {actionItemsData.filter(a => a.completed).length}/{actionItemsData.length}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <ScrollArea className="h-40">
+                <CardContent className="p-3">
+                  <ul className="space-y-2">
+                    {actionItemsData.map(item => (
+                      <li key={item.id} className="flex items-start gap-2" data-testid={`action-summary-${item.id}`}>
+                        <div className={`w-4 h-4 mt-0.5 rounded border flex-shrink-0 flex items-center justify-center ${
+                          item.completed ? "bg-emerald-500 border-emerald-500" : "border-border"
+                        }`}>
+                          {item.completed && (
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm ${item.completed ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                            {item.task}
+                          </p>
+                          <span className="text-xs text-muted-foreground">{item.assignee}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </ScrollArea>
+            </Card>
+          </div>
 
-          <div className="space-y-4">
-            <Card ref={logicFindingsRef} data-testid="summary-logic-findings">
-              <CardHeader className="py-2 px-4 border-b border-border">
+          <div className="relative space-y-1">
+            <Card ref={logicFindingsRef} data-testid="summary-logic-findings" className="relative">
+              <CardHeader className="py-3 px-4 border-b border-border">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <HelpCircle className="w-4 h-4 text-slate-500" />
                   Logic Findings
@@ -592,55 +685,77 @@ export default function MeetingDetail() {
                   </Badge>
                 </CardTitle>
               </CardHeader>
-              <ScrollArea className="h-20">
-                <CardContent className="p-2">
-                  <ul className="space-y-1">
-                    {logicFindings.map(finding => (
-                      <li 
-                        key={finding.id} 
-                        className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 rounded px-1.5 py-1 transition-colors"
-                        onClick={() => scrollToLogicFinding(finding.id)}
-                        data-testid={`logic-summary-${finding.id}`}
-                      >
-                        <div className={`px-1 py-0.5 text-xs rounded border flex-shrink-0 ${logicMarkConfig[finding.type].className}`}>
-                          {finding.type}
-                        </div>
-                        <span className="text-xs text-foreground truncate">{finding.claim}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </ScrollArea>
+              <CardContent className="p-2">
+                <ul className="flex flex-wrap gap-2">
+                  {logicFindings.map((finding) => (
+                    <li 
+                      key={finding.id} 
+                      className={`flex items-center gap-2 cursor-pointer rounded px-2.5 py-1.5 transition-all border ${
+                        selectedFinding === finding.id 
+                          ? "bg-primary/10 border-primary shadow-sm" 
+                          : "border-border hover:bg-muted/50 hover:border-muted-foreground/30"
+                      }`}
+                      onClick={() => setSelectedFinding(finding.id)}
+                      data-testid={`logic-summary-${finding.id}`}
+                    >
+                      <div className={`px-1.5 py-0.5 text-xs rounded border flex-shrink-0 ${logicMarkConfig[finding.type].className}`}>
+                        {finding.type}
+                      </div>
+                      <span className={`text-xs ${selectedFinding === finding.id ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+                        {finding.claim.length > 30 ? finding.claim.substring(0, 30) + "..." : finding.claim}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+              {selectedFinding && (
+                <div className="absolute left-1/2 -bottom-1 -translate-x-1/2 flex flex-col items-center" data-testid="connection-line">
+                  <div className="w-px h-1 bg-gradient-to-b from-primary/60 to-violet-500/60" />
+                </div>
+              )}
             </Card>
 
-            <Card data-testid="section-evidence-drops">
-              <CardHeader className="py-2 px-4 border-b border-border">
+            <Card data-testid="section-evidence-drops" className="relative">
+              {selectedFinding && (
+                <div className="absolute left-1/2 -top-1 -translate-x-1/2 flex flex-col items-center">
+                  <div className="w-px h-1 bg-gradient-to-b from-primary/60 to-violet-500/60" />
+                </div>
+              )}
+              <CardHeader className="py-3 px-4 border-b border-border">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Inbox className="w-4 h-4 text-violet-600" />
                   Evidence Drops
                   <Badge variant="secondary" className="ml-auto text-xs bg-violet-100 text-violet-600">
-                    {evidenceDrops.length}
+                    {filteredEvidenceDrops.length}
                   </Badge>
                 </CardTitle>
               </CardHeader>
-              <ScrollArea className="h-20">
-                <CardContent className="p-2">
-                  <ul className="space-y-1">
-                    {evidenceDrops.map(drop => (
+              <CardContent className="p-3">
+                {filteredEvidenceDrops.length > 0 ? (
+                  <ul className="space-y-2">
+                    {filteredEvidenceDrops.map(drop => (
                       <li 
                         key={drop.id} 
-                        className="group flex items-center gap-2 cursor-pointer hover:bg-muted/50 rounded px-1.5 py-1 transition-colors"
+                        className="group p-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer border border-transparent hover:border-border"
                         data-testid={`evidence-drop-${drop.id}`}
                       >
-                        <span className="text-xs font-medium text-foreground group-hover:text-primary truncate flex-1">
-                          {drop.title}
-                        </span>
-                        <ExternalLink className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                            {drop.title}
+                          </h4>
+                          <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{drop.summary}</p>
+                        <span className="text-xs text-primary mt-1 inline-block">{drop.source}</span>
                       </li>
                     ))}
                   </ul>
-                </CardContent>
-              </ScrollArea>
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center py-4">
+                    선택된 Logic Finding에 대한 추천 자료가 없습니다.
+                  </p>
+                )}
+              </CardContent>
             </Card>
           </div>
         </section>
