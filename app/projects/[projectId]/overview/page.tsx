@@ -91,6 +91,11 @@ interface GapData {
   priority: "high" | "medium" | "low";
   relatedDecisions: string[];
   hasLogicFlag?: boolean;
+  reason?: string;
+  suggestedEvidence?: string;
+  issueType?: string;
+  severity?: string;
+  researchType?: string;
 }
 
 interface ActionItem {
@@ -679,55 +684,77 @@ function ActionItemsCard({
   );
 }
 
-function DecisionIntegrationCard({ decisions }: { decisions: DecisionData[] }) {
-  const pendingDecisions = useMemo(() =>
-    decisions.filter(d => d.status === "draft"),
-    [decisions]
+function CompletedGapsCard({ gaps }: { gaps: GapData[] }) {
+  const completedGaps = useMemo(() =>
+    gaps.filter(g => g.status === "integrated"),
+    [gaps]
   );
+
+  const getSeverityColor = (severity?: string) => {
+    switch (severity?.toLowerCase()) {
+      case 'high': return 'bg-red-50 text-red-700 border-red-100 dark:bg-red-900/20 dark:text-red-400';
+      case 'medium': return 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400';
+      case 'low': return 'bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-900/20 dark:text-blue-400';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
 
   return (
     <Card className="flex flex-col h-full border-none shadow-sm bg-card/50 backdrop-blur-sm overflow-hidden">
       <CardHeader className="py-3 px-4 border-b border-border/50 bg-muted/20">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
-          <div className="p-1 rounded-md bg-blue-100 dark:bg-blue-900/30">
-            <Lightbulb className="w-4 h-4 text-blue-600" />
+          <div className="p-1 rounded-md bg-emerald-100 dark:bg-emerald-900/30">
+            <Check className="w-4 h-4 text-emerald-600" />
           </div>
-          통합 완료 항목
-          <Badge variant="secondary" className="ml-auto text-[10px] px-1.5 h-5 bg-blue-50 text-blue-700 border-blue-100">
-            {pendingDecisions.length}
+          보완 완료 항목
+          <Badge variant="secondary" className="ml-auto text-[10px] px-1.5 h-5 bg-emerald-50 text-emerald-700 border-emerald-100">
+            {completedGaps.length}
           </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0 flex-1 overflow-hidden">
-        {pendingDecisions.length > 0 ? (
-          <div className="divide-y divide-border/40 max-h-[400px] overflow-y-auto scrollbar-thin">
-            {pendingDecisions.map((decision) => (
-              <div key={decision.id} className="group p-4 hover:bg-muted/30 transition-all relative overflow-hidden">
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="space-y-1.5">
-                  <div className="flex items-start justify-between gap-2">
+        {completedGaps.length > 0 ? (
+          <div className="divide-y divide-border/40 h-[400px] overflow-y-auto scrollbar-thin">
+            {completedGaps.map((gap) => (
+              <div key={gap.id} className="group p-4 hover:bg-muted/30 transition-all relative overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="space-y-3">
+                  <div className="space-y-1">
                     <p className="text-sm font-medium text-foreground leading-snug">
-                      {decision.title}
+                      {gap.reason || gap.title || "내용 없음"}
                     </p>
-                    <Badge variant="outline" className="text-[9px] font-normal py-0 px-1 whitespace-nowrap opacity-60">
-                      {decision.createdAt}
-                    </Badge>
-                  </div>
-                  {decision.description && (
-                    <div className="relative">
-                      <p className="text-xs text-muted-foreground leading-relaxed pl-3 border-l-2 border-muted">
-                        {decision.description}
+                    {gap.suggestedEvidence && (
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        {gap.suggestedEvidence}
                       </p>
-                    </div>
-                  )}
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {gap.issueType && (
+                      <Badge variant="outline" className="text-[9px] font-normal py-0 px-1.5 bg-background/50">
+                        {gap.issueType}
+                      </Badge>
+                    )}
+                    {gap.severity && (
+                      <Badge variant="outline" className={`text-[9px] font-medium py-0 px-1.5 border-none ${getSeverityColor(gap.severity)}`}>
+                        {gap.severity}
+                      </Badge>
+                    )}
+                    {gap.researchType && (
+                      <Badge variant="outline" className="text-[9px] font-normal py-0 px-1.5 bg-background/50 italic">
+                        {gap.researchType}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-            <Zap className="w-10 h-10 text-blue-400 mb-2 opacity-20" />
-            <p className="text-sm">통합 대기 중인 항목이 없습니다.</p>
+            <Inbox className="w-10 h-10 opacity-20 mb-2" />
+            <p className="text-sm">보완 완료된 항목이 없습니다.</p>
           </div>
         )}
       </CardContent>
@@ -1023,15 +1050,20 @@ export default function ProjectOverview() {
 
           setGapsData(logicGaps.map((g: any) => ({
             id: g.id,
-            title: g.claim,
-            description: g.gap,
+            title: g.statement || "",
+            description: g.reason || "",
             status: g.review_status === "done" ? "integrated" : "draft",
             strength: "weak",
             evidenceCount: 1,
             segmentCount: 0,
             priority: "high",
             relatedDecisions: [],
-            hasLogicFlag: true
+            hasLogicFlag: true,
+            reason: g.reason,
+            suggestedEvidence: g.suggested_evidence,
+            issueType: g.issue_type,
+            severity: g.severity,
+            researchType: g.research_type
           })));
 
           setActionItemsState(actionItems.map((ai: any) => ({
@@ -1172,7 +1204,7 @@ export default function ProjectOverview() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6" data-testid="section-bottom-row">
               <MeetingIntegrationCalendar projectId={projectId || "1"} meetingsData={meetingsCalendarData} />
-              <DecisionIntegrationCard decisions={decisionsState} />
+              <CompletedGapsCard gaps={gapsData} />
             </div>
           </div>
         )}
