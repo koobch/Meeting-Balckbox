@@ -270,3 +270,19 @@ export async function getProjectOverview(projectId: string) {
         return { success: false, error: error.message };
     }
 }
+
+export async function getExternalEvidences(projectId: string) {
+    try {
+        const { data, error } = await supabase
+            .from('external_evidences')
+            .select('*')
+            .eq('project_id', projectId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return { success: true, data: data || [] };
+    } catch (error: any) {
+        console.error('Failed to fetch external evidences:', error);
+        return { success: false, error: error.message };
+    }
+}
