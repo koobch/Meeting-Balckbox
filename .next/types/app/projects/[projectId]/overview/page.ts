@@ -1,4 +1,4 @@
-// File: /home/runner/workspace/app/projects/[projectId]/overview/page.tsx
+// File: C:\Users\tnqls\.gemini\antigravity\projects\Meeting-Balckbox\app\projects\[projectId]\overview\page.tsx
 import * as entry from '../../../../../../app/projects/[projectId]/overview/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

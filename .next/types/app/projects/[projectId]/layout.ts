@@ -1,4 +1,4 @@
-// File: /home/runner/workspace/app/projects/[projectId]/layout.tsx
+// File: C:\Users\tnqls\.gemini\antigravity\projects\Meeting-Balckbox\app\projects\[projectId]\layout.tsx
 import * as entry from '../../../../../app/projects/[projectId]/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
