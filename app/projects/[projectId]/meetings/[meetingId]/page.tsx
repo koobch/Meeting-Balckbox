@@ -43,7 +43,7 @@ import {
   Calendar,
   Loader2
 } from "lucide-react";
-import { getMeetingDetails, updateLogicGapStatus } from "@/app/actions/meetings";
+import { getMeetingDetails, updateLogicGapStatus, updateActionItemStatus } from "@/app/actions/meetings";
 
 type LogicMarkType = "leap" | "missing" | "ambiguous";
 
@@ -182,6 +182,10 @@ export default function MeetingDetail() {
   const [findingResearchStates, setFindingResearchStates] = useState<Record<string, FindingResearchState>>({});
   const [currentLogicGapIndex, setCurrentLogicGapIndex] = useState(0);
   const [findingLoadingDots, setFindingLoadingDots] = useState<Record<string, number>>({});
+
+  // Hidden items tracking
+  const [hiddenDecisions, setHiddenDecisions] = useState<Set<string>>(new Set());
+  const [hiddenActions, setHiddenActions] = useState<Set<string>>(new Set());
 
   const parseTranscript = (raw: string | null): TranscriptLine[] => {
     if (!raw) {
@@ -483,6 +487,136 @@ export default function MeetingDetail() {
     }
   };
 
+  // Decision handlers
+  const toggleDecisionSelect = (id: string) => {
+    setSelectedDecisions(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleAllDecisions = () => {
+    if (selectedDecisions.size === visibleDecisions.length) {
+      setSelectedDecisions(new Set());
+    } else {
+      setSelectedDecisions(new Set(visibleDecisions.map(d => d.id)));
+    }
+  };
+
+  const hideDecision = (id: string) => {
+    setHiddenDecisions(prev => new Set(prev).add(id));
+    // Also remove from selection if selected
+    setSelectedDecisions(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(id);
+      return newSet;
+    });
+  };
+
+  const handleIntegrateDecisions = async () => {
+    if (selectedDecisions.size === 0) return;
+
+    try {
+      console.log('[Integration] Integrating decisions:', Array.from(selectedDecisions));
+      // TODO: Call n8n webhook
+      alert(`${selectedDecisions.size}개 의사결정을 프로젝트 기억에 통합합니다.`);
+
+      // Reset selection
+      setSelectedDecisions(new Set());
+      setDecisionsSelectMode(false);
+    } catch (error) {
+      console.error('[Integration] Failed:', error);
+      alert('통합에 실패했습니다.');
+    }
+  };
+
+  // Action handlers
+  const toggleActionSelect = (id: string) => {
+    setSelectedActions(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleAllActions = () => {
+    if (selectedActions.size === visibleActions.length) {
+      setSelectedActions(new Set());
+    } else {
+      setSelectedActions(new Set(visibleActions.map(a => a.id)));
+    }
+  };
+
+  const hideAction = (id: string) => {
+    setHiddenActions(prev => new Set(prev).add(id));
+    // Also remove from selection if selected
+    setSelectedActions(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(id);
+      return newSet;
+    });
+  };
+
+  const toggleActionComplete = async (id: string) => {
+    try {
+      const action = actionItemsState.find(a => a.id === id);
+      if (!action) return;
+
+      const newStatus = action.completed ? 'pending' : 'completed';
+
+      // Call API to update status
+      console.log('[Action] Toggling status:', id, newStatus);
+      const result = await updateActionItemStatus(id, newStatus);
+
+      if (result.success) {
+        // Optimistic update
+        setActionItemsState(prev =>
+          prev.map(item =>
+            item.id === id
+              ? { ...item, completed: !item.completed }
+              : item
+          )
+        );
+      } else {
+        throw new Error(result.error || 'Failed to update status');
+      }
+    } catch (error) {
+      console.error('[Action] Failed to toggle:', error);
+      alert('상태 업데이트에 실패했습니다.');
+    }
+  };
+
+  const handleIntegrateActions = async () => {
+    if (selectedActions.size === 0) return;
+
+    try {
+      console.log('[Integration] Integrating actions:', Array.from(selectedActions));
+      // TODO: Call n8n webhook
+      alert(`${selectedActions.size}개 액션 아이템을 프로젝트 기억에 통합합니다.`);
+
+      // Reset selection
+      setSelectedActions(new Set());
+      setActionsSelectMode(false);
+    } catch (error) {
+      console.error('[Integration] Failed:', error);
+      alert('통합에 실패했습니다.');
+    }
+  };
+
+  // Computed values
+  const visibleDecisions = decisionSummariesState.filter(d => !hiddenDecisions.has(d.id));
+  const visibleActions = actionItemsState.filter(a => !hiddenActions.has(a.id));
+  const completedActionsCount = visibleActions.filter(a => a.completed).length;
+
   const currentLogicGap = logicGapsState[currentLogicGapIndex];
 
   if (isLoading) {
@@ -543,9 +677,20 @@ export default function MeetingDetail() {
                 <h2 className="text-sm font-semibold text-foreground">의사 결정 사항</h2>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="bg-slate-100 text-slate-500 hover:bg-slate-100 border-none px-2 h-5">{decisionSummariesState.length}</Badge>
+                <Badge variant="secondary" className="bg-slate-100 text-slate-500 hover:bg-slate-100 border-none px-2 h-5">
+                  {visibleDecisions.length}
+                </Badge>
                 <div className="flex items-center gap-1.5 ml-2">
-                  <Checkbox id="select-all-decisions" />
+                  <Checkbox
+                    id="select-all-decisions"
+                    checked={decisionsSelectMode}
+                    onCheckedChange={(checked) => {
+                      setDecisionsSelectMode(!!checked);
+                      if (!checked) {
+                        setSelectedDecisions(new Set());
+                      }
+                    }}
+                  />
                   <label htmlFor="select-all-decisions" className="text-[10px] text-muted-foreground cursor-pointer">통합 선택</label>
                 </div>
               </div>
@@ -553,16 +698,30 @@ export default function MeetingDetail() {
             <Card className="shadow-sm border-border/50">
               <ScrollArea className="h-[220px]">
                 <div className="p-4 space-y-4">
-                  {decisionSummariesState.map((decision, idx) => (
-                    <div key={decision.id} className="flex items-start gap-3 group">
+                  {visibleDecisions.map((decision, idx) => (
+                    <div
+                      key={decision.id}
+                      className={`flex items-start gap-3 group transition-colors rounded-md -mx-2 px-2 py-1.5 ${selectedDecisions.has(decision.id) ? 'bg-amber-50/50' : ''
+                        }`}
+                    >
+                      {decisionsSelectMode && (
+                        <Checkbox
+                          checked={selectedDecisions.has(decision.id)}
+                          onCheckedChange={() => toggleDecisionSelect(decision.id)}
+                          className="mt-0.5"
+                        />
+                      )}
                       <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5 shrink-0 group-hover:bg-amber-400 transition-colors" />
                       <p className="text-[13.5px] leading-relaxed text-foreground/80 flex-1">{decision.title}</p>
-                      <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 rounded transition-all">
+                      <button
+                        onClick={() => hideDecision(decision.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 rounded transition-all"
+                      >
                         <X className="w-3 h-3 text-muted-foreground" />
                       </button>
                     </div>
                   ))}
-                  {decisionSummariesState.length === 0 && <p className="text-sm text-center py-10 text-muted-foreground italic">기록된 사항이 없습니다.</p>}
+                  {visibleDecisions.length === 0 && <p className="text-sm text-center py-10 text-muted-foreground italic">기록된 사항이 없습니다.</p>}
                 </div>
               </ScrollArea>
             </Card>
@@ -576,9 +735,20 @@ export default function MeetingDetail() {
                 <h2 className="text-sm font-semibold text-foreground">다음 할 일</h2>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-muted-foreground font-medium">1/5</span>
+                <span className="text-[10px] text-muted-foreground font-medium">
+                  {completedActionsCount}/{visibleActions.length}
+                </span>
                 <div className="flex items-center gap-1.5 ml-2">
-                  <Checkbox id="select-all-actions" />
+                  <Checkbox
+                    id="select-all-actions"
+                    checked={actionsSelectMode}
+                    onCheckedChange={(checked) => {
+                      setActionsSelectMode(!!checked);
+                      if (!checked) {
+                        setSelectedActions(new Set());
+                      }
+                    }}
+                  />
                   <label htmlFor="select-all-actions" className="text-[10px] text-muted-foreground cursor-pointer">통합 선택</label>
                 </div>
               </div>
@@ -586,19 +756,37 @@ export default function MeetingDetail() {
             <Card className="shadow-sm border-border/50">
               <ScrollArea className="h-[220px]">
                 <div className="p-4 space-y-4">
-                  {actionItemsState.map((item) => (
-                    <div key={item.id} className="flex items-start gap-4 group">
-                      <Checkbox checked={item.completed} className="mt-0.5 rounded-sm" />
+                  {visibleActions.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`flex items-start gap-4 group transition-colors rounded-md -mx-2 px-2 py-1.5 ${selectedActions.has(item.id) ? 'bg-emerald-50/50' : ''
+                        }`}
+                    >
+                      <Checkbox
+                        checked={item.completed}
+                        onCheckedChange={() => toggleActionComplete(item.id)}
+                        className="mt-0.5 rounded-sm"
+                      />
+                      {actionsSelectMode && (
+                        <Checkbox
+                          checked={selectedActions.has(item.id)}
+                          onCheckedChange={() => toggleActionSelect(item.id)}
+                          className="mt-0.5"
+                        />
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className={`text-[13.5px] leading-relaxed ${item.completed ? 'line-through text-muted-foreground/60' : 'text-foreground/80'}`}>{item.task}</p>
                         <p className="text-[11px] text-muted-foreground/60 mt-0.5">{item.assignee}</p>
                       </div>
-                      <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 rounded transition-all">
+                      <button
+                        onClick={() => hideAction(item.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 rounded transition-all"
+                      >
                         <X className="w-3 h-3 text-muted-foreground" />
                       </button>
                     </div>
                   ))}
-                  {actionItemsState.length === 0 && <p className="text-sm text-center py-10 text-muted-foreground italic">할 일이 없습니다.</p>}
+                  {visibleActions.length === 0 && <p className="text-sm text-center py-10 text-muted-foreground italic">할 일이 없습니다.</p>}
                 </div>
               </ScrollArea>
             </Card>
@@ -877,6 +1065,86 @@ export default function MeetingDetail() {
           </div>
         </div>
       </div>
+
+      {/* Bottom Popup for Decisions */}
+      {decisionsSelectMode && selectedDecisions.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border shadow-lg z-50 animate-in slide-in-from-bottom duration-200">
+          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-amber-50 px-3 py-1.5 rounded-md">
+                <Lightbulb className="w-4 h-4 text-amber-600" />
+                <span className="text-sm font-medium text-amber-900">
+                  선택됨 {selectedDecisions.size}개
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                선택한 항목을 프로젝트 기억에 통합합니다
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedDecisions(new Set());
+                  setDecisionsSelectMode(false);
+                }}
+                className="h-9"
+              >
+                선택 해제
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleIntegrateDecisions}
+                className="h-9 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Check className="w-4 h-4 mr-1.5" />
+                프로젝트 기억에 통합
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Popup for Actions */}
+      {actionsSelectMode && selectedActions.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border shadow-lg z-50 animate-in slide-in-from-bottom duration-200">
+          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-md">
+                <CheckSquare className="w-4 h-4 text-emerald-600" />
+                <span className="text-sm font-medium text-emerald-900">
+                  선택됨 {selectedActions.size}개
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                선택한 항목을 프로젝트 기억에 통합합니다
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedActions(new Set());
+                  setActionsSelectMode(false);
+                }}
+                className="h-9"
+              >
+                선택 해제
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleIntegrateActions}
+                className="h-9 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Check className="w-4 h-4 mr-1.5" />
+                프로젝트 기억에 통합
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

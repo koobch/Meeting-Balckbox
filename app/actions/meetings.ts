@@ -174,3 +174,21 @@ export async function updateLogicGapStatus(gapId: string, status: string) {
         return { success: false, error: error.message };
     }
 }
+
+export async function updateActionItemStatus(itemId: string, status: string) {
+    try {
+        const { data, error } = await supabase
+            .from('action_items')
+            .update({ status })
+            .eq('id', itemId)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return { success: true, data };
+    } catch (error: any) {
+        console.error('Failed to update action item status:', error);
+        return { success: false, error: error.message };
+    }
+}
