@@ -984,8 +984,9 @@ export default function MeetingDetail() {
                     <span className="text-xs text-muted-foreground">{transcript.length}개 발언</span>
                     <Dialog open={speakerDialogOpen} onOpenChange={setSpeakerDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button variant="ghost" size="icon" data-testid="button-speaker-settings">
-                          <Settings className="w-4 h-4" />
+                        <Button variant="ghost" size="sm" className="gap-1" data-testid="button-speaker-settings">
+                          <Settings className="w-3.5 h-3.5" />
+                          <span className="text-xs">화자 지정</span>
                         </Button>
                       </DialogTrigger>
                       <DialogContent data-testid="dialog-speaker-settings">
