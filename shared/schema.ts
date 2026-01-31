@@ -71,13 +71,30 @@ export const logicGaps = pgTable("logic_gaps", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
+export const externalEvidences = pgTable("external_evidences", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull(),
+  driveFileId: text("drive_file_id").notNull().unique(),
+  fileName: text("file_name").notNull(),
+  fileType: varchar("file_type", { length: 100 }),
+  title: text("title").notNull(),
+  summary: text("summary"),
+  isIntegrated: boolean("is_integrated").notNull().default(true),
+  addedBy: text("added_by"),
+  fileSize: text("file_size"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
 export const insertMeetingSchema = createInsertSchema(meetings);
 export const insertActionItemSchema = createInsertSchema(actionItems);
 export const insertDecisionSchema = createInsertSchema(decisions);
 export const insertLogicGapSchema = createInsertSchema(logicGaps);
+export const insertExternalEvidenceSchema = createInsertSchema(externalEvidences);
 
 export type User = typeof users.$inferSelect;
 export type Meeting = typeof meetings.$inferSelect;
 export type ActionItem = typeof actionItems.$inferSelect;
 export type Decision = typeof decisions.$inferSelect;
 export type LogicGap = typeof logicGaps.$inferSelect;
+export type ExternalEvidence = typeof externalEvidences.$inferSelect;

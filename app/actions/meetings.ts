@@ -312,3 +312,67 @@ export async function getProjectById(projectId: string) {
         return { success: false, error: error.message };
     }
 }
+
+export async function uploadEvidence(formData: FormData) {
+    try {
+        const file = formData.get('file') as File;
+        const projectId = formData.get('projectId') as string;
+
+        if (!file) throw new Error('파일이 제공되지 않았습니다.');
+        if (!projectId) throw new Error('프로젝트 ID가 제공되지 않았습니다.');
+
+        // 1. Ensure bucket exists
+        const { data: buckets, error: getBucketsError } = await supabase.storage.listBuckets();
+        if (getBucketsError) throw getBucketsError;
+
+        const bucketExists = buckets.some(b => b.name === 'evidence');
+        if (!bucketExists) {
+            const { error: createBucketError } = await supabase.storage.createBucket('evidence', {
+                public: true
+            });
+            if (createBucketError) throw createBucketError;
+        }
+
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+        const filePath = `${projectId}/${fileName}`;
+
+        // Convert File to ArrayBuffer for Supabase upload
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('evidence')
+            .upload(filePath, buffer, {
+                contentType: file.type,
+                upsert: true
+            });
+
+        if (uploadError) throw uploadError;
+
+        // Fix encoding for Korean filenames
+        const decodedFileName = Buffer.from(file.name, 'latin1').toString('utf8');
+
+        // Save metadata to DB
+        const { data, error: dbError } = await supabase
+            .from('external_evidences')
+            .insert({
+                project_id: projectId,
+                drive_file_id: uploadData.path, // Using storage path as drive_file_id for now
+                file_name: decodedFileName,
+                file_type: file.type,
+                title: decodedFileName.replace(/\.[^/.]+$/, ""), // title without extension
+                file_size: Math.round(file.size / 1024).toString(), // Store as KB
+                is_integrated: true
+            })
+            .select()
+            .single();
+
+        if (dbError) throw dbError;
+
+        return { success: true, data };
+    } catch (error: any) {
+        console.error('Evidence upload error:', error);
+        return { success: false, error: error.message };
+    }
+}

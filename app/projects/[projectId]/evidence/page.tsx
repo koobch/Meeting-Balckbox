@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { FileText, ExternalLink, Calendar, Upload, Download, Trash2, File, Search, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getExternalEvidences } from "@/app/actions/meetings";
+import { getExternalEvidences, uploadEvidence } from "@/app/actions/meetings";
 
 interface EvidenceItem {
   id: string;
@@ -57,6 +57,7 @@ export default function EvidencePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [evidenceData, setEvidenceData] = useState<EvidenceItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -89,7 +90,7 @@ export default function EvidencePage() {
             addedAt: item.created_at ? new Date(item.created_at).toISOString().split('T')[0] : '',
             linkedDecisions: item.linked_decisions || [],
             fileName: item.file_name,
-            fileSize: item.file_size ? formatFileSize(parseInt(item.file_size)) : '0 KB'
+            fileSize: item.file_size ? `${item.file_size} KB` : '0 KB'
           };
         });
 
@@ -109,9 +110,44 @@ export default function EvidencePage() {
       setLoading(false);
     }
   };
-  const [searchQuery, setSearchQuery] = useState("");
+  const handleFileSelect = () => {
+    fileInputRef.current?.click();
+  };
 
-  // OLD: handleFileSelect and handleUpload removed as per user request to disable upload functionality
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !projectId) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("projectId", projectId);
+
+    try {
+      const result = await uploadEvidence(formData);
+      if (result.success) {
+        toast({
+          title: "업로드 성공",
+          description: "새로운 근거 자료가 등록되었습니다."
+        });
+        loadEvidences();
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error: any) {
+      console.error("[EvidencePage] Upload failed:", error);
+      toast({
+        title: "업로드 실패",
+        description: error.message || "파일 업로드 중 오류가 발생했습니다.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleDownload = (evidence: EvidenceItem) => {
     if (evidence.fileName) {
@@ -151,6 +187,25 @@ export default function EvidencePage() {
             <p className="text-sm text-muted-foreground">프로젝트 근거 자료</p>
           </div>
           <div>
+            <Button
+              className="gap-2"
+              onClick={handleFileSelect}
+              disabled={isUploading}
+            >
+              {isUploading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Upload className="w-4 h-4" />
+              )}
+              파일 업로드
+            </Button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleUpload}
+              className="hidden"
+              accept=".pdf,.doc,.docx,.txt"
+            />
           </div>
         </div>
       </header>
