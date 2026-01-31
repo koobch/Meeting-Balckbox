@@ -412,13 +412,13 @@ export default function MeetingDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b border-border bg-white sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-3">
+    <div className="flex-1 flex flex-col overflow-hidden bg-background">
+      <header className="border-b border-border bg-white sticky top-0 z-10 flex-shrink-0">
+        <div className="px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Link 
-                href={`/projects/${params.projectId}/overview`}
+                href={`/projects/${params.projectId}/meetings`}
                 className="p-1.5 rounded-md hover:bg-muted transition-colors"
                 data-testid="link-back"
               >
@@ -476,7 +476,7 @@ export default function MeetingDetail() {
         </div>
       </header>
 
-      <div className="flex-1 max-w-7xl mx-auto px-6 py-4 w-full">
+      <div className="flex-1 overflow-auto px-6 py-4">
         <section className="mb-4" data-testid="section-keywords">
           <div className="flex flex-wrap gap-2">
             {keywords.map(keyword => (
@@ -493,7 +493,7 @@ export default function MeetingDetail() {
 
         <div className="flex gap-6">
           <main className="flex-1 min-w-0" ref={scrollRef}>
-            <Card className="h-[calc(100vh-220px)]">
+            <Card className="h-[calc(100vh-280px)]">
               <CardHeader className="py-3 px-4 border-b border-border">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">

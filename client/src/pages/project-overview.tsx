@@ -803,24 +803,17 @@ export default function ProjectOverview() {
   const hasActiveFilters = activeFilter !== null || statusFilter !== null;
   
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex-1 overflow-auto bg-background">
       <header className="border-b border-border bg-white sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground text-lg font-semibold">P</span>
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold text-foreground" data-testid="text-project-title">
-                프로젝트 {params.projectId}
-              </h1>
-              <p className="text-sm text-muted-foreground">Overview</p>
-            </div>
-          </div>
+        <div className="px-6 py-4">
+          <h1 className="text-xl font-semibold text-foreground" data-testid="text-project-title">
+            프로젝트 {params.projectId}
+          </h1>
+          <p className="text-sm text-muted-foreground">Overview</p>
         </div>
       </header>
       
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="px-6 py-6">
         <div className="flex gap-6">
           <main className="flex-1 min-w-0">
             <section className="mb-6" data-testid="section-keywords">
