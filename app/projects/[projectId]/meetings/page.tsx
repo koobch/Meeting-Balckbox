@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useState, useMemo, useRef } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Calendar, Users, Clock, ChevronRight, Search, Mic } from "lucide-react";
-import VoiceRecorder from "@/components/VoiceRecorder";
+import { Calendar, Users, Clock, ChevronRight, Search, Mic, Upload, Loader2 } from "lucide-react";
+import { createMeeting } from "@/app/actions/meetings";
 
 const meetingsData = [
   {
@@ -43,7 +43,43 @@ const meetingsData = [
 
 export default function MeetingsPage() {
   const params = useParams();
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.txt')) {
+      alert("Please upload a .txt file.");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const text = await file.text();
+      const result = await createMeeting({
+        title: `Imported Transcript`,
+        projectId: "550e8400-e29b-41d4-a716-446655440000",
+        transcript: text,
+        participants: []
+      });
+
+      if (result.success) {
+        alert("Transcript uploaded successfully!");
+        router.refresh(); // Refresh the list
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error: any) {
+      alert("Failed to upload transcript: " + error.message);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const filteredMeetings = useMemo(() => {
     if (!searchQuery.trim()) return meetingsData;
@@ -69,6 +105,23 @@ export default function MeetingsPage() {
             </div>
 
             <div className="flex items-center gap-3">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                accept=".txt"
+                className="hidden"
+              />
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+              >
+                {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                Upload Transcript (.txt)
+              </Button>
+
               <div className="relative w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
