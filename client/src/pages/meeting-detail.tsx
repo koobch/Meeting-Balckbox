@@ -890,9 +890,9 @@ export default function MeetingDetail() {
           </div>
         </section>
 
-        <div className="flex gap-6 flex-1 min-h-0">
+        <div className="flex gap-6 flex-1 min-h-[500px]">
           <main className="flex-1 min-w-0 flex flex-col" ref={scrollRef}>
-            <Card className="flex-1 flex flex-col overflow-hidden" data-testid="card-transcript">
+            <Card className="flex-1 flex flex-col overflow-hidden min-h-0" data-testid="card-transcript">
               <CardHeader className="py-3 px-4 border-b border-border flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -917,8 +917,8 @@ export default function MeetingDetail() {
             </Card>
           </main>
 
-          <aside className="w-80 flex-shrink-0 flex flex-col gap-4" data-testid="sidebar-summary">
-            <Card className="flex-1 flex flex-col overflow-hidden">
+          <aside className="w-80 flex-shrink-0 flex flex-col gap-4 min-h-0" data-testid="sidebar-summary">
+            <Card className="flex-1 flex flex-col overflow-hidden min-h-0">
               <CardHeader className="py-3 px-4 border-b border-border flex-shrink-0">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <FileText className="w-4 h-4 text-violet-600" />
@@ -943,7 +943,7 @@ export default function MeetingDetail() {
               </div>
             </Card>
 
-            <Card className="flex-1 flex flex-col overflow-hidden" data-testid="card-paragraph-summaries">
+            <Card className="flex-1 flex flex-col overflow-hidden min-h-0" data-testid="card-paragraph-summaries">
               <CardHeader className="py-3 px-4 border-b border-border flex-shrink-0">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <FileText className="w-4 h-4 text-amber-600" />
