@@ -192,3 +192,29 @@ export async function updateActionItemStatus(itemId: string, status: string) {
         return { success: false, error: error.message };
     }
 }
+
+export async function integrateMeetingItems(items: any[]) {
+    try {
+        const webhookUrl = process.env.N8N_INTEGRATION_URL;
+        if (!webhookUrl) {
+            throw new Error('N8N_INTEGRATION_URL is not defined');
+        }
+
+        console.log('[Integration] Sending items to n8n:', items.length);
+
+        const response = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(items)
+        });
+
+        if (!response.ok) {
+            throw new Error(`n8n responded with ${response.status}`);
+        }
+
+        return { success: true };
+    } catch (error: any) {
+        console.error('[Integration] Error:', error);
+        return { success: false, error: error.message };
+    }
+}

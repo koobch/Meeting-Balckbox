@@ -43,7 +43,7 @@ import {
   Calendar,
   Loader2
 } from "lucide-react";
-import { getMeetingDetails, updateLogicGapStatus, updateActionItemStatus } from "@/app/actions/meetings";
+import { getMeetingDetails, updateLogicGapStatus, updateActionItemStatus, integrateMeetingItems } from "@/app/actions/meetings";
 
 type LogicMarkType = "leap" | "missing" | "ambiguous";
 
@@ -531,19 +531,57 @@ export default function MeetingDetail() {
   };
 
   const handleIntegrateDecisions = async () => {
-    if (selectedDecisions.size === 0) return;
+    // This is now handled by handleUnifiedIntegration
+    handleUnifiedIntegration();
+  };
+
+  const handleUnifiedIntegration = async () => {
+    if (selectedDecisions.size === 0 && selectedActions.size === 0) return;
 
     try {
-      console.log('[Integration] Integrating decisions:', Array.from(selectedDecisions));
-      // TODO: Call n8n webhook
-      alert(`${selectedDecisions.size}개 의사결정을 프로젝트 기억에 통합합니다.`);
+      console.log('[Integration] Starting unified integration with n8n');
 
-      // Reset selection
-      setSelectedDecisions(new Set());
-      setDecisionsSelectMode(false);
-    } catch (error) {
-      console.error('[Integration] Failed:', error);
-      alert('통합에 실패했습니다.');
+      const payload: any[] = [];
+      const mId = meetingId;
+
+      // Add selected decisions
+      selectedDecisions.forEach(id => {
+        payload.push({
+          meeting_id: mId,
+          decisions_id: id,
+          desicion_status: "true",
+          actions_id: null,
+          actions_status: null
+        });
+      });
+
+      // Add selected actions
+      selectedActions.forEach(id => {
+        payload.push({
+          meeting_id: mId,
+          decisions_id: null,
+          desicion_status: null,
+          actions_id: id,
+          actions_status: "true"
+        });
+      });
+
+      console.log('[Integration] Sending items count:', payload.length);
+      const result = await integrateMeetingItems(payload);
+
+      if (result.success) {
+        alert(`${payload.length}개 항목을 프로젝트 기억에 통합했습니다.`);
+        // Reset selection and modes
+        setSelectedDecisions(new Set());
+        setSelectedActions(new Set());
+        setDecisionsSelectMode(false);
+        setActionsSelectMode(false);
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error: any) {
+      console.error('[Integration] Unified integration failed:', error);
+      alert('통합에 실패했습니다: ' + (error.message || '알 수 없는 오류'));
     }
   };
 
@@ -608,20 +646,8 @@ export default function MeetingDetail() {
   };
 
   const handleIntegrateActions = async () => {
-    if (selectedActions.size === 0) return;
-
-    try {
-      console.log('[Integration] Integrating actions:', Array.from(selectedActions));
-      // TODO: Call n8n webhook
-      alert(`${selectedActions.size}개 액션 아이템을 프로젝트 기억에 통합합니다.`);
-
-      // Reset selection
-      setSelectedActions(new Set());
-      setActionsSelectMode(false);
-    } catch (error) {
-      console.error('[Integration] Failed:', error);
-      alert('통합에 실패했습니다.');
-    }
+    // This is now handled by handleUnifiedIntegration
+    handleUnifiedIntegration();
   };
 
   // Computed values
@@ -1137,8 +1163,7 @@ export default function MeetingDetail() {
                 </Button>
                 <Button
                   onClick={() => {
-                    if (selectedDecisions.size > 0) handleIntegrateDecisions();
-                    if (selectedActions.size > 0) handleIntegrateActions();
+                    handleUnifiedIntegration();
                   }}
                   className="h-9 bg-blue-600 hover:bg-blue-700 text-white"
                 >
