@@ -133,16 +133,44 @@ export async function getMeetingDetails(meetingId: string) {
 
         if (actionItemsError) throw actionItemsError;
 
+        // 4. Fetch logic gaps
+        const { data: logicGaps, error: logicGapsError } = await supabase
+            .from('logic_gaps')
+            .select('*')
+            .eq('meeting_id', meetingId)
+            .order('created_at', { ascending: true });
+
+        if (logicGapsError) throw logicGapsError;
+
         return {
             success: true,
             data: {
                 meeting,
                 decisions,
-                actionItems
+                actionItems,
+                logicGaps
             }
         };
     } catch (error: any) {
         console.error('Failed to fetch meeting details:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function updateLogicGapStatus(gapId: string, status: string) {
+    try {
+        const { data, error } = await supabase
+            .from('logic_gaps')
+            .update({ review_status: status })
+            .eq('id', gapId)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return { success: true, data };
+    } catch (error: any) {
+        console.error('Failed to update logic gap status:', error);
         return { success: false, error: error.message };
     }
 }

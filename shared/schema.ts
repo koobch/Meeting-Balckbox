@@ -55,11 +55,29 @@ export const decisions = pgTable("decisions", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
+export const logicGaps = pgTable("logic_gaps", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  meetingId: uuid("meeting_id").references(() => meetings.id, { onDelete: 'cascade' }),
+  speaker: varchar("speaker", { length: 100 }),
+  statement: text("statement").notNull(),
+  issueType: varchar("issue_type", { length: 20 }),
+  severity: varchar("severity", { length: 10 }),
+  reason: text("reason"),
+  suggestedEvidence: text("suggested_evidence"),
+  context: text("context"),
+  researchType: varchar("research_type", { length: 255 }),
+  reviewStatus: varchar("review_status", { length: 255 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
 export const insertMeetingSchema = createInsertSchema(meetings);
 export const insertActionItemSchema = createInsertSchema(actionItems);
 export const insertDecisionSchema = createInsertSchema(decisions);
+export const insertLogicGapSchema = createInsertSchema(logicGaps);
 
 export type User = typeof users.$inferSelect;
 export type Meeting = typeof meetings.$inferSelect;
 export type ActionItem = typeof actionItems.$inferSelect;
 export type Decision = typeof decisions.$inferSelect;
+export type LogicGap = typeof logicGaps.$inferSelect;

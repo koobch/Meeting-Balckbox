@@ -43,7 +43,7 @@ import {
   Calendar,
   Loader2
 } from "lucide-react";
-import { getMeetingDetails } from "@/app/actions/meetings";
+import { getMeetingDetails, updateLogicGapStatus } from "@/app/actions/meetings";
 
 type LogicMarkType = "leap" | "missing" | "ambiguous";
 
@@ -102,6 +102,20 @@ interface LogicFinding {
   relatedLineIds: string[];
 }
 
+interface LogicGap {
+  id: string;
+  speaker: string | null;
+  statement: string;
+  issueType: string | null;
+  severity: string | null;
+  reason: string | null;
+  suggestedEvidence: string | null;
+  context: string | null;
+  researchType: string | null;
+  reviewStatus: string | null;
+}
+
+
 type FindingResearchState = "idle" | "loading" | "done" | "error";
 
 const speakerColors: Record<string, string> = {
@@ -144,6 +158,8 @@ export default function MeetingDetail() {
   const [actionItemsState, setActionItemsState] = useState<ActionItem[]>([]);
   const [decisionSummariesState, setDecisionSummariesState] = useState<DecisionSummary[]>([]);
   const [paragraphSummaries, setParagraphSummaries] = useState<ParagraphSummary[]>([]);
+  const [logicGapsState, setLogicGapsState] = useState<LogicGap[]>([]);
+
 
   const [activeLine, setActiveLine] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -164,13 +180,42 @@ export default function MeetingDetail() {
 
   const [logicFindingsState, setLogicFindingsState] = useState<LogicFinding[]>([]);
   const [findingResearchStates, setFindingResearchStates] = useState<Record<string, FindingResearchState>>({});
+  const [currentLogicGapIndex, setCurrentLogicGapIndex] = useState(0);
   const [findingLoadingDots, setFindingLoadingDots] = useState<Record<string, number>>({});
 
   const parseTranscript = (raw: string | null): TranscriptLine[] => {
-    if (!raw) return [];
-    const lines = raw.split(/\n\n|\n/);
-    return lines.filter(l => l.trim()).map((line, idx) => {
-      const match = line.match(/^\[(\d{2}:\d{2})\]\s+(Speaker\s+\d+):\s+(.*)$/);
+    if (!raw) {
+      console.log('[Transcript] No raw data provided');
+      return [];
+    }
+
+    console.log('[Transcript] Raw data length:', raw.length);
+    console.log('[Transcript] First 500 chars:', raw.substring(0, 500));
+
+    // Split by double newline first, then single newline
+    const lines = raw.split(/\n\n/).flatMap(block => block.split(/\n/));
+    const filteredLines = lines.filter(l => l.trim());
+
+    console.log('[Transcript] Total lines after split:', filteredLines.length);
+
+    const parsed = filteredLines.map((line, idx) => {
+      // Try multiple regex patterns
+      // Pattern 1: [00:00] Speaker 0: text
+      let match = line.match(/^\[(\d{2}:\d{2})\]\s+(Speaker\s+\d+):\s+(.*)$/);
+
+      // Pattern 2: [0:00] Speaker 0: text (single digit minute)
+      if (!match) {
+        match = line.match(/^\[(\d{1,2}:\d{2})\]\s+(Speaker\s+\d+):\s+(.*)$/);
+      }
+
+      // Pattern 3: Speaker 0 [00:00]: text
+      if (!match) {
+        const altMatch = line.match(/^(Speaker\s+\d+)\s+\[(\d{1,2}:\d{2})\]:\s+(.*)$/);
+        if (altMatch) {
+          match = [altMatch[0], altMatch[2], altMatch[1], altMatch[3]] as RegExpMatchArray;
+        }
+      }
+
       if (match) {
         const [, timestamp, speaker, text] = match;
         return {
@@ -178,17 +223,25 @@ export default function MeetingDetail() {
           speaker,
           speakerColor: speakerColors[speaker] || "bg-slate-400",
           timestamp,
-          text
+          text: text.trim()
         };
       }
+
+      // If no pattern matches, treat entire line as text with unknown speaker
+      console.log('[Transcript] Failed to parse line:', line.substring(0, 100));
       return {
         id: `t-${idx}`,
         speaker: "Unknown",
         speakerColor: "bg-slate-400",
         timestamp: "00:00",
-        text: line
+        text: line.trim()
       };
     });
+
+    console.log('[Transcript] Successfully parsed lines:', parsed.length);
+    console.log('[Transcript] Sample parsed:', parsed.slice(0, 2));
+
+    return parsed;
   };
 
   const fetchDetails = useCallback(async () => {
@@ -239,32 +292,75 @@ export default function MeetingDetail() {
           integrationStatus: d.is_integrated ? "integrated" : "not"
         })));
 
+        // Fetch Logic Gaps
+        if (result.data.logicGaps) {
+          setLogicGapsState(result.data.logicGaps.map((lg: any) => ({
+            id: lg.id,
+            speaker: lg.speaker,
+            statement: lg.statement,
+            issueType: lg.issue_type || lg.issueType,
+            severity: lg.severity,
+            reason: lg.reason,
+            suggestedEvidence: lg.suggested_evidence || lg.suggestedEvidence,
+            context: lg.context,
+            researchType: lg.research_type || lg.researchType,
+            reviewStatus: lg.review_status || lg.reviewStatus
+          })));
+        }
+
         // Parse Timeline Summary JSON
         if (meeting.timeline_summary) {
+          console.log('[Timeline] Raw timeline_summary type:', typeof meeting.timeline_summary);
+          console.log('[Timeline] Raw timeline_summary:', meeting.timeline_summary);
+
           try {
-            const parsed = JSON.parse(meeting.timeline_summary);
+            let parsed;
+
+            // If it's already an object/array, use it directly
+            if (typeof meeting.timeline_summary === 'object') {
+              parsed = meeting.timeline_summary;
+            } else {
+              // If it's a string, try to parse it
+              parsed = JSON.parse(meeting.timeline_summary);
+            }
+
+            console.log('[Timeline] Parsed type:', typeof parsed, 'isArray:', Array.isArray(parsed));
+
             if (Array.isArray(parsed)) {
-              setParagraphSummaries(parsed.map((ps: any, idx: number) => ({
+              const summaries = parsed.map((ps: any, idx: number) => ({
                 id: `ps-${idx}`,
-                start_time: ps.start_time || "00:00",
-                end_time: ps.end_time || "",
-                title: ps.title || "요약",
-                summary: ps.summary || ""
-              })));
+                start_time: ps.start_time || ps.startTime || "00:00",
+                end_time: ps.end_time || ps.endTime || "",
+                title: ps.title || ps.topic || "요약",
+                summary: ps.summary || ps.content || ""
+              }));
+
+              console.log('[Timeline] Parsed summaries count:', summaries.length);
+              console.log('[Timeline] Sample summary:', summaries[0]);
+              setParagraphSummaries(summaries);
             } else {
               throw new Error("Not an array");
             }
           } catch (e) {
+            console.error('[Timeline] Failed to parse timeline_summary:', e);
+            console.log('[Timeline] Using fallback - treating as single summary');
+
+            // Fallback: treat as single text summary
             setParagraphSummaries([{
               id: "ps-1",
               start_time: "00:00",
               end_time: "End",
               title: "전체 요약",
-              summary: meeting.timeline_summary
+              summary: typeof meeting.timeline_summary === 'string'
+                ? meeting.timeline_summary
+                : JSON.stringify(meeting.timeline_summary)
             }]);
           }
+        } else {
+          console.log('[Timeline] No timeline_summary data');
         }
       }
+
     } catch (err) {
       console.error("Failed to fetch meeting details:", err);
     } finally {
@@ -291,6 +387,63 @@ export default function MeetingDetail() {
       scrollToTranscriptLine(line.id);
     }
   };
+
+  // Logic Gap handlers
+  const handlePrevLogicGap = () => {
+    setCurrentLogicGapIndex(prev =>
+      prev > 0 ? prev - 1 : logicGapsState.length - 1
+    );
+  };
+
+  const handleNextLogicGap = () => {
+    setCurrentLogicGapIndex(prev =>
+      prev < logicGapsState.length - 1 ? prev + 1 : 0
+    );
+  };
+
+  const handleViewRelatedStatement = (speaker: string | null) => {
+    if (!speaker) return;
+    // Find first transcript line from this speaker
+    const line = transcript.find(t => t.speaker === speaker);
+    if (line) {
+      scrollToTranscriptLine(line.id);
+    }
+  };
+
+  const handleRunResearch = async (gapId: string) => {
+    // TODO: Implement research logic
+    console.log('[Research] Running research for gap:', gapId);
+    alert('리서치 기능은 곧 구현될 예정입니다.');
+  };
+
+  const handleMarkAsResolved = async (gapId: string) => {
+    try {
+      console.log('[LogicGap] Marking as resolved:', gapId);
+
+      // Call API to update review_status
+      const result = await updateLogicGapStatus(gapId, 'resolved');
+
+      if (result.success) {
+        // Optimistic update
+        setLogicGapsState(prev =>
+          prev.map(gap =>
+            gap.id === gapId
+              ? { ...gap, reviewStatus: 'resolved' }
+              : gap
+          )
+        );
+
+        alert('보완 완료로 표시되었습니다.');
+      } else {
+        throw new Error(result.error || 'Failed to update status');
+      }
+    } catch (error) {
+      console.error('[LogicGap] Failed to mark as resolved:', error);
+      alert('보완 완료 처리에 실패했습니다. 다시 시도해주세요.');
+    }
+  };
+
+  const currentLogicGap = logicGapsState[currentLogicGapIndex];
 
   if (isLoading) {
     return (
@@ -339,25 +492,251 @@ export default function MeetingDetail() {
         </div>
       </header>
 
-      <div className="flex-1 min-h-0 flex flex-col p-6 overflow-hidden">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full min-h-0">
+      <div className="flex-1 flex flex-col p-6 gap-6 overflow-y-auto bg-slate-50/50">
+        {/* 상단: 의사결정 & 할 일 (1:1) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-shrink-0">
+          {/* 의사결정 사항 */}
+          <section className="flex flex-col">
+            <div className="flex items-center justify-between mb-2 px-1">
+              <div className="flex items-center gap-2">
+                <Lightbulb className="w-4 h-4 text-amber-500" />
+                <h2 className="text-sm font-semibold text-foreground">의사 결정 사항</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="bg-slate-100 text-slate-500 hover:bg-slate-100 border-none px-2 h-5">{decisionSummariesState.length}</Badge>
+                <div className="flex items-center gap-1.5 ml-2">
+                  <Checkbox id="select-all-decisions" />
+                  <label htmlFor="select-all-decisions" className="text-[10px] text-muted-foreground cursor-pointer">통합 선택</label>
+                </div>
+              </div>
+            </div>
+            <Card className="shadow-sm border-border/50">
+              <ScrollArea className="h-[220px]">
+                <div className="p-4 space-y-4">
+                  {decisionSummariesState.map((decision, idx) => (
+                    <div key={decision.id} className="flex items-start gap-3 group">
+                      <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5 shrink-0 group-hover:bg-amber-400 transition-colors" />
+                      <p className="text-[13.5px] leading-relaxed text-foreground/80 flex-1">{decision.title}</p>
+                      <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 rounded transition-all">
+                        <X className="w-3 h-3 text-muted-foreground" />
+                      </button>
+                    </div>
+                  ))}
+                  {decisionSummariesState.length === 0 && <p className="text-sm text-center py-10 text-muted-foreground italic">기록된 사항이 없습니다.</p>}
+                </div>
+              </ScrollArea>
+            </Card>
+          </section>
 
-          {/* 회의록 (좌측 - 7개 컬럼 차지) */}
-          <section className="lg:col-span-7 flex flex-col min-h-0 h-full">
-            <div className="flex items-center justify-between mb-3 px-1 flex-shrink-0">
+          {/* 다음 할 일 */}
+          <section className="flex flex-col">
+            <div className="flex items-center justify-between mb-2 px-1">
+              <div className="flex items-center gap-2">
+                <CheckSquare className="w-4 h-4 text-emerald-500" />
+                <h2 className="text-sm font-semibold text-foreground">다음 할 일</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground font-medium">1/5</span>
+                <div className="flex items-center gap-1.5 ml-2">
+                  <Checkbox id="select-all-actions" />
+                  <label htmlFor="select-all-actions" className="text-[10px] text-muted-foreground cursor-pointer">통합 선택</label>
+                </div>
+              </div>
+            </div>
+            <Card className="shadow-sm border-border/50">
+              <ScrollArea className="h-[220px]">
+                <div className="p-4 space-y-4">
+                  {actionItemsState.map((item) => (
+                    <div key={item.id} className="flex items-start gap-4 group">
+                      <Checkbox checked={item.completed} className="mt-0.5 rounded-sm" />
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-[13.5px] leading-relaxed ${item.completed ? 'line-through text-muted-foreground/60' : 'text-foreground/80'}`}>{item.task}</p>
+                        <p className="text-[11px] text-muted-foreground/60 mt-0.5">{item.assignee}</p>
+                      </div>
+                      <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 rounded transition-all">
+                        <X className="w-3 h-3 text-muted-foreground" />
+                      </button>
+                    </div>
+                  ))}
+                  {actionItemsState.length === 0 && <p className="text-sm text-center py-10 text-muted-foreground italic">할 일이 없습니다.</p>}
+                </div>
+              </ScrollArea>
+            </Card>
+          </section>
+        </div>
+
+        {/* 중앙: 보완 필요 항목 (Full Width) */}
+        <section className="flex flex-col flex-shrink-0">
+          <div className="flex items-center justify-between mb-2 px-1">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-orange-500" />
+              <h2 className="text-sm font-semibold text-foreground">보완 필요 항목</h2>
+            </div>
+            <Badge variant="secondary" className="bg-orange-50 text-orange-600 hover:bg-orange-50 border-none px-2 h-5">
+              {logicGapsState.length}
+            </Badge>
+          </div>
+          <Card className="shadow-sm border-border/50 relative overflow-hidden group">
+            {logicGapsState.length > 0 ? (
+              <>
+                {/* Navigation Arrows */}
+                {logicGapsState.length > 1 && (
+                  <>
+                    <div className="absolute inset-y-0 left-0 flex items-center z-10">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handlePrevLogicGap}
+                        className="h-12 w-8 rounded-l-none bg-background/50 backdrop-blur-sm border-y border-r border-border/40 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <div className="absolute inset-y-0 right-0 flex items-center z-10">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleNextLogicGap}
+                        className="h-12 w-8 rounded-r-none bg-background/50 backdrop-blur-sm border-y border-l border-border/40 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </>
+                )}
+
+                <div className="p-8 flex flex-col items-center">
+                  <div className="max-w-4xl w-full">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Badge variant="outline" className="bg-orange-50/50 border-orange-200 text-orange-600 px-3 py-1 font-medium flex items-center gap-1.5 h-auto rounded-md shadow-sm">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        {currentLogicGap?.statement || "내용 없음"}
+                      </Badge>
+                      <div className="ml-auto flex items-center gap-2">
+                        {currentLogicGap?.issueType && (
+                          <Badge variant="secondary" className="bg-slate-100 text-slate-500 text-[10px] font-medium h-6 px-3 border-none">
+                            {currentLogicGap.issueType}
+                          </Badge>
+                        )}
+                        {currentLogicGap?.severity && (
+                          <Badge
+                            variant="secondary"
+                            className={`text-[10px] font-medium h-6 px-3 border-none ${currentLogicGap.severity === 'high'
+                              ? 'bg-red-50 text-red-600'
+                              : currentLogicGap.severity === 'medium'
+                                ? 'bg-orange-50 text-orange-600'
+                                : 'bg-yellow-50 text-yellow-600'
+                              }`}
+                          >
+                            {currentLogicGap.severity}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    <p className="text-sm text-foreground/70 mb-6 pl-1 italic">
+                      {currentLogicGap?.reason || "이유가 명시되지 않았습니다."}
+                    </p>
+
+                    {currentLogicGap?.suggestedEvidence && (
+                      <div className="mb-6 pl-1">
+                        <p className="text-xs font-semibold text-muted-foreground mb-1">제안된 근거:</p>
+                        <p className="text-sm text-foreground/80">{currentLogicGap.suggestedEvidence}</p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-4 border-t border-border/40 pt-6">
+                      {currentLogicGap?.speaker && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewRelatedStatement(currentLogicGap.speaker)}
+                          className="h-8 gap-1.5 text-xs text-muted-foreground hover:bg-slate-50 border-border/60 rounded-md"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          {currentLogicGap.speaker} 발언
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewRelatedStatement(currentLogicGap?.speaker || null)}
+                        className="h-8 text-xs text-muted-foreground hover:bg-slate-50 border-border/60 rounded-md px-4"
+                      >
+                        발언 보기
+                      </Button>
+
+                      <div className="flex-1 flex justify-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRunResearch(currentLogicGap?.id || '')}
+                          className="h-8 gap-2 text-[11px] text-violet-600 hover:bg-violet-50 hover:text-violet-700 font-medium"
+                        >
+                          <Play className="w-3 h-3" />
+                          리서치 실행
+                        </Button>
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleMarkAsResolved(currentLogicGap?.id || '')}
+                        disabled={currentLogicGap?.reviewStatus === 'resolved'}
+                        className="h-8 gap-1.5 text-xs text-muted-foreground hover:bg-slate-50 border-border/60 rounded-md px-3 disabled:opacity-50"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        {currentLogicGap?.reviewStatus === 'resolved' ? '보완 완료됨' : '보완 완료'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Pagination Dots */}
+                  {logicGapsState.length > 1 && (
+                    <div className="flex gap-2 mt-8">
+                      {logicGapsState.map((_, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => setCurrentLogicGapIndex(idx)}
+                          className={`w-1.5 h-1.5 rounded-full cursor-pointer transition-all ${idx === currentLogicGapIndex
+                            ? 'bg-primary/60 shadow-[0_0_8px_rgba(59,130,246,0.3)]'
+                            : 'bg-slate-200 hover:bg-slate-300'
+                            }`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="p-8 flex flex-col items-center justify-center">
+                <AlertTriangle className="w-12 h-12 text-slate-300 mb-3" />
+                <p className="text-sm text-muted-foreground text-center">
+                  보완이 필요한 항목이 없습니다.
+                </p>
+              </div>
+            )}
+          </Card>
+        </section>
+
+        {/* 하단: 회의록 | 주제 & 요약 (7:5) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0 flex-1">
+          {/* 회의록 (좌측 - 7개 컬럼) */}
+          <section className="lg:col-span-7 flex flex-col min-h-0">
+            <div className="flex items-center justify-between mb-2 px-1">
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-blue-500" />
                 <h2 className="text-sm font-semibold text-foreground">회의록</h2>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-xs text-muted-foreground">{transcript.length}개 발언</span>
-                <button className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                <span className="text-[11px] text-muted-foreground font-medium">{transcript.length}개 발언</span>
+                <button className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors font-medium">
                   <UserCog className="w-3.5 h-3.5" />
                   화자 지정
                 </button>
               </div>
             </div>
-            <Card className="flex-1 flex flex-col min-h-0 overflow-hidden shadow-sm border-border/50">
+            <Card className="flex-1 min-h-0 flex flex-col shadow-sm border-border/50">
               <ScrollArea className="flex-1">
                 <div className="p-4 space-y-6">
                   {transcript.map((line) => (
@@ -373,10 +752,10 @@ export default function MeetingDetail() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-bold text-foreground/90">{line.speaker}</span>
-                          <span className="text-xs text-muted-foreground/70 font-mono">{line.timestamp}</span>
-                          {line.isHighlight && (
-                            <Badge variant="secondary" className="bg-blue-50 text-[10px] text-blue-500 hover:bg-blue-50 py-0 h-4 border-none">핵심</Badge>
+                          <span className="text-sm font-bold text-foreground/80">{line.speaker}</span>
+                          <span className="text-xs text-muted-foreground/60 font-mono tracking-tighter">{line.timestamp}</span>
+                          {Math.random() > 0.8 && (
+                            <Badge variant="secondary" className="bg-blue-50 text-[10px] text-blue-500 hover:bg-blue-50 py-0 h-4 border-none font-bold">핵심</Badge>
                           )}
                         </div>
                         <p className="text-[13.5px] leading-relaxed text-foreground/80 break-words">{line.text}</p>
@@ -389,109 +768,64 @@ export default function MeetingDetail() {
             </Card>
           </section>
 
-          {/* 정보 패널 (우측 - 5개 컬럼 차지) */}
-          <div className="lg:col-span-5 flex flex-col gap-6 min-h-0 h-full overflow-y-auto pr-2 scrollbar-hide">
-
+          {/* 주요 주제 & 요약 (우측 - 5개 컬럼) */}
+          <div className="lg:col-span-5 flex flex-col gap-6 min-h-0">
             {/* 주요 주제 */}
-            <section className="flex flex-col shrink-0">
-              <div className="flex items-center gap-2 mb-3 px-1">
+            <section className="flex flex-col">
+              <div className="flex items-center gap-2 mb-2 px-1">
                 <Bookmark className="w-4 h-4 text-violet-500" />
                 <h2 className="text-sm font-semibold text-foreground">주요 주제</h2>
               </div>
               <Card className="shadow-sm border-border/50">
-                <div className="p-1">
-                  {topics.map((topic, idx) => (
-                    <button
-                      key={topic.id}
-                      onClick={() => scrollToTime(topic.timestamp)}
-                      className={`w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-muted/50 transition-colors text-left ${idx !== topics.length - 1 ? 'border-b border-border/40' : ''}`}
-                    >
-                      <span className="font-medium text-foreground/80 truncate pr-4">{topic.topic}</span>
-                      <span className="text-xs font-mono text-muted-foreground shrink-0">{topic.timestamp}</span>
-                    </button>
-                  ))}
-                  {topics.length === 0 && <p className="text-center py-6 text-muted-foreground text-xs italic">주제 분석 정보가 없습니다.</p>}
-                </div>
-              </Card>
-            </section>
-
-            {/* 의사결정 사항 */}
-            <section className="flex flex-col shrink-0">
-              <div className="flex items-center gap-2 mb-3 px-1">
-                <Lightbulb className="w-4 h-4 text-amber-500" />
-                <h2 className="text-sm font-semibold text-foreground">의사결정 사항</h2>
-              </div>
-              <Card className="shadow-sm border-border/50">
-                <div className="p-4 space-y-3">
-                  {decisionSummariesState.map((decision, idx) => (
-                    <div key={decision.id} className={`flex items-start gap-3 ${idx !== decisionSummariesState.length - 1 ? 'border-b border-border/20 pb-3' : ''}`}>
-                      <Checkbox checked={decision.integrationStatus === "integrated"} disabled className="mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium text-foreground/90">{decision.title}</p>
-                        <Badge variant="outline" className="text-[10px] mt-1 uppercase text-muted-foreground/70 scale-90 origin-left">
-                          {decision.integrationStatus}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                  {decisionSummariesState.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">기록된 사항이 없습니다.</p>}
-                </div>
-              </Card>
-            </section>
-
-            {/* 다음 할 일 */}
-            <section className="flex flex-col shrink-0">
-              <div className="flex items-center gap-2 mb-3 px-1">
-                <CheckSquare className="w-4 h-4 text-emerald-500" />
-                <h2 className="text-sm font-semibold text-foreground">다음 할 일</h2>
-              </div>
-              <Card className="shadow-sm border-border/50">
-                <div className="p-4 space-y-3">
-                  {actionItemsState.map((item, idx) => (
-                    <div key={item.id} className={`flex items-start gap-3 ${idx !== actionItemsState.length - 1 ? 'border-b border-border/20 pb-3' : ''}`}>
-                      <Checkbox checked={item.completed} disabled className="mt-0.5" />
-                      <div className="flex-1">
-                        <p className={`text-sm font-medium ${item.completed ? 'line-through text-muted-foreground' : 'text-foreground/90'}`}>{item.task}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="secondary" className="text-[10px] py-0 px-2 bg-muted/50">{item.assignee}</Badge>
-                          {item.dueDate && <span className="text-[10px] text-muted-foreground font-mono">~{item.dueDate}</span>}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {actionItemsState.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">할 일이 없습니다.</p>}
-                </div>
+                <ScrollArea className="h-auto max-h-[220px]">
+                  <div className="p-1">
+                    {topics.map((topic, idx) => (
+                      <button
+                        key={topic.id}
+                        onClick={() => scrollToTime(topic.timestamp)}
+                        className={`w-full flex items-center justify-between px-4 py-3 text-[13px] hover:bg-slate-50 transition-colors text-left ${idx !== topics.length - 1 ? 'border-b border-border/30' : ''}`}
+                      >
+                        <span className="font-medium text-foreground/80 truncate pr-4">{topic.topic}</span>
+                        <span className="text-[11px] font-mono text-muted-foreground shrink-0">{topic.timestamp}</span>
+                      </button>
+                    ))}
+                    {topics.length === 0 && <p className="text-center py-6 text-muted-foreground text-xs italic">정보가 없습니다.</p>}
+                  </div>
+                </ScrollArea>
               </Card>
             </section>
 
             {/* 단락별 요약 */}
-            <section className="flex flex-col shrink-0">
-              <div className="flex items-center gap-2 mb-3 px-1">
+            <section className="flex flex-col flex-1 min-h-0">
+              <div className="flex items-center gap-2 mb-2 px-1">
                 <FileText className="w-4 h-4 text-orange-500" />
                 <h2 className="text-sm font-semibold text-foreground">단락별 요약</h2>
               </div>
-              <Card className="shadow-sm border-border/50">
-                <div className="p-4 space-y-6">
-                  {paragraphSummaries.map((ps, idx) => (
-                    <div key={ps.id} className={`${idx !== paragraphSummaries.length - 1 ? 'border-b border-border/40 pb-6' : ''}`}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-bold text-blue-500 font-mono tracking-tight bg-blue-50 px-2 py-0.5 rounded">
-                          {ps.start_time} - {ps.end_time}
-                        </span>
+              <Card className="flex-1 min-h-0 flex flex-col shadow-sm border-border/50">
+                <ScrollArea className="flex-1">
+                  <div className="p-4 space-y-6">
+                    {paragraphSummaries.map((ps, idx) => (
+                      <div key={ps.id} className={`${idx !== paragraphSummaries.length - 1 ? 'border-b border-border/30 pb-6' : ''}`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-[11px] font-bold text-blue-500 font-mono tracking-tighter bg-blue-50 px-2 py-0.5 rounded">
+                            {ps.start_time} - {ps.end_time}
+                          </span>
+                        </div>
+                        <div className="space-y-1.5">
+                          <p className="text-sm font-bold text-foreground/80">{ps.title}</p>
+                          <p className="text-[13px] leading-relaxed text-foreground/70">{ps.summary}</p>
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-bold text-foreground/90">{ps.title}</p>
-                        <p className="text-[13.5px] leading-relaxed text-foreground/80">{ps.summary}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {paragraphSummaries.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">요약 정보가 없습니다.</p>}
-                </div>
+                    ))}
+                    {paragraphSummaries.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">요약 정보가 없습니다.</p>}
+                  </div>
+                </ScrollArea>
               </Card>
             </section>
           </div>
         </div>
       </div>
+
     </div>
   );
 }
