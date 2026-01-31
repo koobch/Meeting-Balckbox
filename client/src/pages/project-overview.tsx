@@ -816,21 +816,6 @@ export default function ProjectOverview() {
       <div className="px-6 py-6">
         <div className="flex gap-6">
           <main className="flex-1 min-w-0">
-            <section className="mb-6" data-testid="section-keywords">
-              <h2 className="text-sm font-medium text-muted-foreground mb-3">키워드</h2>
-              <div className="flex flex-wrap gap-2">
-                {keywords.map(keyword => (
-                  <button
-                    key={keyword}
-                    className="px-3 py-1.5 text-sm rounded-full border border-border bg-white text-foreground hover-elevate transition-all"
-                    data-testid={`chip-keyword-${keyword}`}
-                  >
-                    {keyword}
-                  </button>
-                ))}
-              </div>
-            </section>
-
             <FilterSortBar
               statusFilter={statusFilter}
               onStatusFilterChange={setStatusFilter}

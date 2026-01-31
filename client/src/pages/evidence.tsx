@@ -1,8 +1,31 @@
+import { useState, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, ExternalLink, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { FileText, ExternalLink, Calendar, Upload, Download, X, File, Plus } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
-const evidenceData = [
+interface EvidenceItem {
+  id: string;
+  title: string;
+  summary: string;
+  source: string;
+  type: "interview" | "external" | "document" | "meeting" | "file";
+  addedAt: string;
+  linkedDecisions: string[];
+  fileName?: string;
+  fileSize?: string;
+}
+
+const initialEvidenceData: EvidenceItem[] = [
   {
     id: "ev-1",
     title: "사용자 인터뷰 녹취록",
@@ -37,7 +60,9 @@ const evidenceData = [
     source: "내부 문서",
     type: "document",
     addedAt: "2025-01-27",
-    linkedDecisions: ["dec-2", "dec-3"]
+    linkedDecisions: ["dec-2", "dec-3"],
+    fileName: "competitor_analysis.pdf",
+    fileSize: "2.4 MB"
   },
   {
     id: "ev-5",
@@ -54,18 +79,107 @@ const typeConfig = {
   interview: { label: "인터뷰", className: "bg-blue-100 text-blue-700" },
   external: { label: "외부 자료", className: "bg-violet-100 text-violet-700" },
   document: { label: "문서", className: "bg-emerald-100 text-emerald-700" },
-  meeting: { label: "미팅", className: "bg-amber-100 text-amber-700" }
+  meeting: { label: "미팅", className: "bg-amber-100 text-amber-700" },
+  file: { label: "첨부파일", className: "bg-slate-100 text-slate-700" }
 };
 
 export default function EvidencePage() {
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [evidenceData, setEvidenceData] = useState<EvidenceItem[]>(initialEvidenceData);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadTitle, setUploadTitle] = useState("");
+  const [uploadSummary, setUploadSummary] = useState("");
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadFile(file);
+      setUploadTitle(file.name.replace(/\.[^/.]+$/, ""));
+      setShowUploadDialog(true);
+    }
+  };
+
+  const handleUpload = () => {
+    if (!uploadFile) return;
+
+    const newEvidence: EvidenceItem = {
+      id: `ev-${Date.now()}`,
+      title: uploadTitle || uploadFile.name,
+      summary: uploadSummary || "업로드된 파일",
+      source: "업로드",
+      type: "file",
+      addedAt: new Date().toISOString().split('T')[0],
+      linkedDecisions: [],
+      fileName: uploadFile.name,
+      fileSize: formatFileSize(uploadFile.size)
+    };
+
+    setEvidenceData(prev => [newEvidence, ...prev]);
+    setShowUploadDialog(false);
+    setUploadFile(null);
+    setUploadTitle("");
+    setUploadSummary("");
+
+    toast({
+      title: "파일 업로드 완료",
+      description: `${uploadFile.name} 파일이 업로드되었습니다.`
+    });
+  };
+
+  const handleDownload = (evidence: EvidenceItem) => {
+    if (evidence.fileName) {
+      const blob = new Blob(["Sample file content for " + evidence.title], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = evidence.fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "다운로드 시작",
+        description: `${evidence.fileName} 파일을 다운로드합니다.`
+      });
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
   return (
     <div className="flex-1 overflow-auto">
       <header className="border-b border-border bg-white sticky top-0 z-10">
-        <div className="px-6 py-4">
-          <h1 className="text-xl font-semibold text-foreground" data-testid="text-page-title">
-            Evidence
-          </h1>
-          <p className="text-sm text-muted-foreground">프로젝트 근거 자료</p>
+        <div className="px-6 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-foreground" data-testid="text-page-title">
+              Evidence
+            </h1>
+            <p className="text-sm text-muted-foreground">프로젝트 근거 자료</p>
+          </div>
+          <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileSelect}
+              data-testid="input-file-upload"
+            />
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              className="gap-2"
+              data-testid="button-upload-file"
+            >
+              <Upload className="w-4 h-4" />
+              파일 업로드
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -74,11 +188,15 @@ export default function EvidencePage() {
           {evidenceData.map(evidence => {
             const typeInfo = typeConfig[evidence.type as keyof typeof typeConfig];
             return (
-              <Card key={evidence.id} className="hover-elevate cursor-pointer" data-testid={`evidence-card-${evidence.id}`}>
+              <Card key={evidence.id} className="hover-elevate" data-testid={`evidence-card-${evidence.id}`}>
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
                     <div className="w-9 h-9 rounded-md bg-slate-100 flex items-center justify-center flex-shrink-0">
-                      <FileText className="w-4 h-4 text-slate-600" />
+                      {evidence.type === "file" ? (
+                        <File className="w-4 h-4 text-slate-600" />
+                      ) : (
+                        <FileText className="w-4 h-4 text-slate-600" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -97,9 +215,27 @@ export default function EvidencePage() {
                           <Calendar className="w-3 h-3" />
                           {evidence.addedAt}
                         </span>
+                        {evidence.fileName && (
+                          <span className="flex items-center gap-1">
+                            <File className="w-3 h-3" />
+                            {evidence.fileSize}
+                          </span>
+                        )}
                         <span>연결된 결정 {evidence.linkedDecisions.length}개</span>
                       </div>
                     </div>
+                    {evidence.fileName && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownload(evidence)}
+                        className="flex-shrink-0 gap-1"
+                        data-testid={`button-download-${evidence.id}`}
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        다운로드
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -107,6 +243,61 @@ export default function EvidencePage() {
           })}
         </div>
       </div>
+
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>파일 정보 입력</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            {uploadFile && (
+              <div className="flex items-center gap-3 p-3 rounded-md bg-muted">
+                <File className="w-8 h-8 text-muted-foreground" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{uploadFile.name}</p>
+                  <p className="text-xs text-muted-foreground">{formatFileSize(uploadFile.size)}</p>
+                </div>
+              </div>
+            )}
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">제목</label>
+              <Input
+                placeholder="자료 제목을 입력하세요"
+                value={uploadTitle}
+                onChange={(e) => setUploadTitle(e.target.value)}
+                data-testid="input-upload-title"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">설명 (선택)</label>
+              <Input
+                placeholder="자료에 대한 간단한 설명"
+                value={uploadSummary}
+                onChange={(e) => setUploadSummary(e.target.value)}
+                data-testid="input-upload-summary"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowUploadDialog(false);
+                setUploadFile(null);
+              }}
+              data-testid="button-cancel-upload"
+            >
+              취소
+            </Button>
+            <Button
+              onClick={handleUpload}
+              data-testid="button-confirm-upload"
+            >
+              업로드
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

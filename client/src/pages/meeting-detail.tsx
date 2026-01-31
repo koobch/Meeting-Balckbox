@@ -124,16 +124,6 @@ const meetingInfo = {
   participants: ["김연구", "이디자인", "박개발", "최PM"]
 };
 
-const keywords = [
-  "사용자 피드백",
-  "페인포인트",
-  "온보딩",
-  "UI 개선",
-  "우선순위",
-  "MVP",
-  "경쟁사"
-];
-
 const speakerColors: Record<string, string> = {
   "김연구": "bg-blue-500",
   "이디자인": "bg-violet-500",
@@ -222,6 +212,21 @@ const paragraphSummaries: ParagraphSummary[] = [
   { id: "ps-3", timeRange: "04:00 - 06:00", summary: "협업 기능 중 실시간 편집은 1.1 버전으로 연기, 코멘트 기능만 MVP 포함. 가격 정책은 추가 조사 필요." },
   { id: "ps-4", timeRange: "06:00 - 09:00", summary: "UI 개선점: 다크모드, 대시보드 시각화 추가. 모바일 사용률 40%로 반응형 디자인 필수. 이메일 알림 MVP 포함." },
   { id: "ps-5", timeRange: "09:00 - 12:35", summary: "MVP 스코프 확정: 온보딩, 템플릿, 코멘트, 시각화, 반응형, 다크모드, 이메일 알림. 2월 10일 개발 완료, 15일 출시 목표." }
+];
+
+interface DecisionSummary {
+  id: string;
+  title: string;
+  status: "confirmed" | "deferred" | "pending";
+}
+
+const decisionSummaries: DecisionSummary[] = [
+  { id: "ds-1", title: "온보딩 5분 내 완료 목표", status: "confirmed" },
+  { id: "ds-2", title: "MVP에 기본 템플릿 3종 포함", status: "confirmed" },
+  { id: "ds-3", title: "실시간 편집 기능 1.1 버전으로 연기", status: "deferred" },
+  { id: "ds-4", title: "코멘트 기능 MVP 포함", status: "confirmed" },
+  { id: "ds-5", title: "대시보드 시각화 MVP 포함", status: "confirmed" },
+  { id: "ds-6", title: "가격 정책은 추가 조사 후 결정", status: "pending" }
 ];
 
 function LogicMarkBadge({ 
@@ -476,25 +481,108 @@ export default function MeetingDetail() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto px-6 py-4">
-        <section className="mb-4" data-testid="section-keywords">
-          <div className="flex flex-wrap gap-2">
-            {keywords.map(keyword => (
-              <span
-                key={keyword}
-                className="px-3 py-1 text-sm rounded-full border border-border bg-white text-foreground"
-                data-testid={`chip-keyword-${keyword}`}
-              >
-                {keyword}
-              </span>
-            ))}
-          </div>
+      <div className="flex-1 overflow-auto px-6 py-4 flex flex-col">
+        <section className="mb-4 grid grid-cols-3 gap-4 flex-shrink-0" data-testid="section-summary">
+          <Card data-testid="summary-decisions">
+            <CardHeader className="py-3 px-4 border-b border-border">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Lightbulb className="w-4 h-4 text-amber-500" />
+                Decisions
+                <Badge variant="secondary" className="ml-auto text-xs">
+                  {decisionSummaries.length}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <ScrollArea className="h-40">
+              <CardContent className="p-3">
+                <ul className="space-y-2">
+                  {decisionSummaries.map(decision => (
+                    <li key={decision.id} className="flex items-start gap-2" data-testid={`decision-${decision.id}`}>
+                      <div className={`w-1.5 h-1.5 mt-1.5 rounded-full flex-shrink-0 ${
+                        decision.status === "confirmed" ? "bg-emerald-500" : 
+                        decision.status === "deferred" ? "bg-amber-500" : "bg-slate-400"
+                      }`} />
+                      <span className="text-sm text-foreground">{decision.title}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </ScrollArea>
+          </Card>
+
+          <Card data-testid="summary-action-items">
+            <CardHeader className="py-3 px-4 border-b border-border">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <ListChecks className="w-4 h-4 text-emerald-500" />
+                다음 할 일
+                <Badge variant="secondary" className="ml-auto text-xs">
+                  {actionItemsData.filter(a => a.completed).length}/{actionItemsData.length}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <ScrollArea className="h-40">
+              <CardContent className="p-3">
+                <ul className="space-y-2">
+                  {actionItemsData.map(item => (
+                    <li key={item.id} className="flex items-start gap-2" data-testid={`action-summary-${item.id}`}>
+                      <div className={`w-4 h-4 mt-0.5 rounded border flex-shrink-0 flex items-center justify-center ${
+                        item.completed ? "bg-emerald-500 border-emerald-500" : "border-border"
+                      }`}>
+                        {item.completed && (
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm ${item.completed ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                          {item.task}
+                        </p>
+                        <span className="text-xs text-muted-foreground">{item.assignee}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </ScrollArea>
+          </Card>
+
+          <Card data-testid="summary-logic-findings">
+            <CardHeader className="py-3 px-4 border-b border-border">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-slate-500" />
+                Logic Findings
+                <Badge variant="secondary" className="ml-auto text-xs bg-slate-100 text-slate-600">
+                  {logicFindings.length}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <ScrollArea className="h-40">
+              <CardContent className="p-3">
+                <ul className="space-y-2">
+                  {logicFindings.map(finding => (
+                    <li 
+                      key={finding.id} 
+                      className="flex items-start gap-2 cursor-pointer hover:bg-muted/50 rounded p-1.5 -mx-1.5 transition-colors"
+                      onClick={() => scrollToLogicFinding(finding.id)}
+                      data-testid={`logic-summary-${finding.id}`}
+                    >
+                      <div className={`px-1.5 py-0.5 text-xs rounded border flex-shrink-0 ${logicMarkConfig[finding.type].className}`}>
+                        {finding.type}
+                      </div>
+                      <span className="text-sm text-foreground line-clamp-2">{finding.claim}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </ScrollArea>
+          </Card>
         </section>
 
-        <div className="flex gap-6">
-          <main className="flex-1 min-w-0" ref={scrollRef}>
-            <Card className="h-[calc(100vh-280px)]">
-              <CardHeader className="py-3 px-4 border-b border-border">
+        <div className="flex gap-6 flex-1 min-h-0">
+          <main className="flex-1 min-w-0 flex flex-col" ref={scrollRef}>
+            <Card className="flex-1 flex flex-col min-h-[400px]">
+              <CardHeader className="py-3 px-4 border-b border-border flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
                     <MessageSquare className="w-4 h-4 text-primary" />
@@ -503,7 +591,7 @@ export default function MeetingDetail() {
                   <span className="text-xs text-muted-foreground">{transcript.length}개 발언</span>
                 </div>
               </CardHeader>
-              <ScrollArea className="h-[calc(100%-52px)]">
+              <ScrollArea className="flex-1">
                 <div className="divide-y divide-border/50">
                   {transcript.map(line => (
                     <TranscriptItem 
@@ -636,10 +724,11 @@ export default function MeetingDetail() {
 
       {role === "lead" && showMergeTray && !pendingMerge.isIntegrated && (
         <div 
-          className="fixed bottom-0 left-0 right-0 z-20 animate-in slide-in-from-bottom duration-300"
+          className="fixed bottom-0 right-0 z-20 animate-in slide-in-from-bottom duration-300 pointer-events-none"
+          style={{ left: '256px' }}
           data-testid="merge-tray"
         >
-          <div className="max-w-3xl mx-auto px-6 pb-6">
+          <div className="max-w-3xl mx-auto px-6 pb-6 pointer-events-auto">
             <div className="bg-white border border-border rounded-lg shadow-lg p-4">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
