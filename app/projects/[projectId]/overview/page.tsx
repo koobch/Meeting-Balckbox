@@ -39,7 +39,8 @@ import {
   User,
   Clock
 } from "lucide-react";
-import { getProjectOverview, getProjectById } from "@/app/actions/meetings";
+import { getProjectOverview, getProjectById, updateActionItemStatus } from "@/app/actions/meetings";
+import { useToast } from "@/hooks/use-toast";
 
 type Status = "draft" | "integrated";
 type EvidenceStrength = "strong" | "medium" | "weak";
@@ -92,6 +93,7 @@ interface ActionItem {
   title: string;
   assignee: string;
   completed: boolean;
+  createdAt: string;
 }
 
 interface EvidenceDrop {
@@ -550,56 +552,69 @@ function ProjectInfoCard({ projectInfo }: { projectInfo: ProjectInfo | null }) {
   );
 }
 
-function ActionItemsCard({ actionItems }: { actionItems: ActionItem[] }) {
-  const [items, setItems] = useState<ActionItem[]>([]);
-
-  useEffect(() => {
-    setItems(actionItems);
+function ActionItemsCard({
+  actionItems,
+  onToggle
+}: {
+  actionItems: ActionItem[];
+  onToggle: (id: string | number) => Promise<void>;
+}) {
+  const sortedItems = useMemo(() => {
+    return [...actionItems].sort((a, b) => {
+      if (a.completed !== b.completed) {
+        return a.completed ? 1 : -1;
+      }
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+    });
   }, [actionItems]);
 
-  const toggleItem = (id: string | number) => {
-    // Optimistic UI update could go here
-    setItems(prev => prev.map(item =>
-      item.id === id ? { ...item, completed: !item.completed } : item
-    ));
-  };
-
   return (
-    <Card data-testid="card-action-items">
+    <Card data-testid="card-action-items" className="flex flex-col h-full">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
           <CheckSquare className="w-4 h-4 text-emerald-600" />
           다음 할 일
           <Badge variant="secondary" className="ml-auto text-xs">
-            {items.filter(i => i.completed).length}/{items.length}
+            {actionItems.filter(i => i.completed).length}/{actionItems.length}
           </Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <ul className="space-y-2 max-h-[200px] overflow-y-auto">
-          {items.map(item => (
-            <li key={item.id} className="flex items-start gap-2">
-              <Checkbox
-                id={item.id}
-                checked={item.completed}
-                onCheckedChange={() => toggleItem(item.id)}
-                className="mt-0.5"
-                data-testid={`checkbox-action-${item.id}`}
-              />
-              <label
-                htmlFor={item.id}
-                className={`text-sm flex-1 cursor-pointer ${item.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}
-              >
-                {item.title}
-              </label>
-            </li>
-          ))}
+      <CardContent className="flex-1 overflow-hidden">
+        <ul className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+          {sortedItems.length > 0 ? (
+            sortedItems.map(item => (
+              <li key={item.id} className="flex items-start gap-2">
+                <Checkbox
+                  id={item.id}
+                  checked={item.completed}
+                  onCheckedChange={() => onToggle(item.id)}
+                  disabled={item.completed}
+                  className="mt-0.5"
+                  data-testid={`checkbox-action-${item.id}`}
+                />
+                <label
+                  htmlFor={item.id}
+                  className={`text-sm flex-1 cursor-pointer ${item.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}
+                >
+                  {item.title}
+                </label>
+              </li>
+            ))
+          ) : (
+            <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+              <p className="text-xs">할 일이 없습니다.</p>
+            </div>
+          )}
         </ul>
       </CardContent>
     </Card>
   );
 }
 
+// OLD Components preserved but unused in current simplified view
+/*
 function DecisionIntegrityCard({
   activeFilter,
   onFilterChange,
@@ -688,7 +703,7 @@ function DecisionIntegrityCard({
   );
 }
 
-function EvidenceDropsCard({ meetings }: { meetings: MeetingData[] }) {
+function EvidenceDropsCard({meetings}: {meetings: MeetingData[] }) {
   const evidenceDrops: EvidenceDrop[] = meetings.map(m => ({
     id: `ev-${m.id}`,
     title: `${m.title} 녹취록`,
@@ -745,9 +760,9 @@ function FilterSortBar({
   onVisibilityChange: (visibility: CardVisibility) => void;
 }) {
   const toggleButtons = [
-    { key: "weak" as const, label: "Weak only" },
-    { key: "flags" as const, label: "Flags only" },
-    { key: "integrated" as const, label: "Integrated only" }
+    {key: "weak" as const, label: "Weak only" },
+    {key: "flags" as const, label: "Flags only" },
+    {key: "integrated" as const, label: "Integrated only" }
   ];
 
   return (
@@ -824,10 +839,12 @@ function FilterSortBar({
     </div>
   );
 }
+*/
 
 export default function ProjectOverview() {
   const params = useParams();
   const projectId = params.projectId as string;
+  const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(true);
   // OLD: Filters and sort types removed to simplify overview
@@ -835,7 +852,7 @@ export default function ProjectOverview() {
   const [activeFilter, setActiveFilter] = useState<FilterType>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
   const [sortType, setSortType] = useState<SortType>("recent");
-  const [visibility, setVisibility] = useState<CardVisibility>({ decisions: true, meetings: true });
+  const [visibility, setVisibility] = useState<CardVisibility>({decisions: true, meetings: true });
   */
 
   const [decisionsState, setDecisionsState] = useState<DecisionData[]>([]);
@@ -844,6 +861,8 @@ export default function ProjectOverview() {
   const [actionItemsState, setActionItemsState] = useState<ActionItem[]>([]);
   const [meetingsCalendarData, setMeetingsCalendarData] = useState<any>({});
   const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null);
+  const [projectName, setProjectName] = useProjectName(projectId || "1");
+  const { toast } = useToast();
 
   useEffect(() => {
     async function fetchOverview() {
@@ -897,7 +916,8 @@ export default function ProjectOverview() {
             id: ai.id,
             title: ai.task,
             assignee: ai.assignee || "미지정",
-            completed: ai.status === "completed"
+            completed: ai.status === "completed",
+            createdAt: ai.created_at
           })));
 
           // Format meetings for calendar
@@ -935,6 +955,33 @@ export default function ProjectOverview() {
     setGapsData(prev => prev.filter(gap => gap.id !== gapId));
   };
 
+  const handleToggleActionItem = async (id: string | number) => {
+    // Optimistic Update
+    const originalItems = [...actionItemsState];
+    setActionItemsState(prev => prev.map(item =>
+      item.id === id ? { ...item, completed: true } : item
+    ));
+
+    try {
+      const result = await updateActionItemStatus(id.toString(), "completed");
+      if (!result.success) throw new Error(result.error);
+
+      toast({
+        title: "할 일 완료",
+        description: "상태가 업데이트되었습니다."
+      });
+    } catch (error: any) {
+      console.error("Failed to update action item:", error);
+      // Rollback
+      setActionItemsState(originalItems);
+      toast({
+        title: "업데이트 실패",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
   // OLD: Filter and Sort logic removed for simplified overview
   /*
   const getPriorityScore = ...
@@ -945,8 +992,6 @@ export default function ProjectOverview() {
   const hasResults = ...
   const hasActiveFilters = ...
   */
-
-  const [projectName, setProjectName] = useProjectName(projectId || "1");
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
@@ -973,7 +1018,10 @@ export default function ProjectOverview() {
           <div className="space-y-6" data-testid="section-top-row">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <ProjectInfoCard projectInfo={projectInfo} />
-              <ActionItemsCard actionItems={actionItemsState} />
+              <ActionItemsCard
+                actionItems={actionItemsState}
+                onToggle={handleToggleActionItem}
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
