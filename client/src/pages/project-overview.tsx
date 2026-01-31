@@ -795,9 +795,11 @@ export default function ProjectOverview() {
       </header>
       
       <div className="flex-1 overflow-auto px-6 py-6">
-        <div className="grid grid-cols-3 gap-4 mb-6" data-testid="section-top-row">
-          <LiveBriefCard />
-          <ActionItemsCard />
+        <div className="space-y-4 mb-6" data-testid="section-top-row">
+          <div className="grid grid-cols-2 gap-4">
+            <LiveBriefCard />
+            <ActionItemsCard />
+          </div>
           <DecisionIntegrityCard 
             activeFilter={activeFilter} 
             onFilterChange={setActiveFilter} 
