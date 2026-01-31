@@ -109,7 +109,6 @@ export default function EvidencePage() {
       setLoading(false);
     }
   };
-  const [deleteTarget, setDeleteTarget] = useState<EvidenceItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   // OLD: handleFileSelect and handleUpload removed as per user request to disable upload functionality
@@ -133,18 +132,7 @@ export default function EvidencePage() {
     }
   };
 
-  const handleDelete = () => {
-    if (!deleteTarget) return;
-
-    setEvidenceData(prev => prev.filter(e => e.id !== deleteTarget.id));
-
-    toast({
-      title: "삭제 완료",
-      description: `${deleteTarget.title} 자료가 삭제되었습니다.`
-    });
-
-    setDeleteTarget(null);
-  };
+  // OLD: handleDelete removed as per user request to disable deletion
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
@@ -234,7 +222,6 @@ export default function EvidencePage() {
                                 {evidence.fileSize}
                               </span>
                             )}
-                            <span>연결된 결정 {evidence.linkedDecisions.length}개</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
@@ -248,16 +235,6 @@ export default function EvidencePage() {
                             <Download className="w-3.5 h-3.5" />
                             다운로드
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setDeleteTarget(evidence)}
-                            className="gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            data-testid={`button-delete-${evidence.id}`}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            삭제
-                          </Button>
                         </div>
                       </div>
                     </CardContent>
@@ -270,26 +247,7 @@ export default function EvidencePage() {
 
       {/* OLD: Upload Dialog removed */}
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>삭제하시겠습니까?</AlertDialogTitle>
-            <AlertDialogDescription>
-              "{deleteTarget?.title}" 자료를 삭제합니다. 이 작업은 되돌릴 수 없습니다.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">취소</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-delete"
-            >
-              삭제
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* OLD: Delete Confirmation Dialog removed */}
     </div>
   );
 }
