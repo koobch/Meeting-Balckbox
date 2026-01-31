@@ -2,16 +2,13 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { saveRecentMeeting } from "@/components/app-shell";
 import { useProjectName } from "@/lib/project-context";
+import { useProjectMemory, MemoryItem } from "@/lib/project-memory-context";
 import { InlineEditableText } from "@/components/inline-editable-text";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   ChevronLeft,
   Play,
@@ -31,9 +28,9 @@ import {
   UserCog,
   Inbox,
   ExternalLink,
-  ChevronDown,
   Circle,
-  CircleDot
+  CircleDot,
+  Database
 } from "lucide-react";
 
 type LogicMarkType = "leap" | "missing" | "ambiguous";
@@ -418,42 +415,131 @@ function LogicFindingCard({
 
 export default function MeetingDetail() {
   const params = useParams<{ projectId: string; meetingId: string }>();
+  const projectId = params.projectId || "1";
+  const meetingId = params.meetingId || "m1";
+  
   const [activeLine, setActiveLine] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [highlightedFinding, setHighlightedFinding] = useState<string | null>(null);
   const [selectedFinding, setSelectedFinding] = useState<string>(logicFindings[0]?.id || "");
   const [role, setRole] = useState<"lead" | "member">("lead");
-  const [pendingMerge, setPendingMerge] = useState({ decisions: 2, evidence: 3, isIntegrated: false });
-  const [showMergeTray, setShowMergeTray] = useState(true);
   const [meetingTitle, setMeetingTitle] = useState(meetingInfo.title);
-  const [projectName, setProjectName] = useProjectName(params.projectId || "1");
-  const [decisionSummaries, setDecisionSummaries] = useState<DecisionSummary[]>(initialDecisionSummaries);
+  const [projectName, setProjectName] = useProjectName(projectId);
+  const [decisionSummaries] = useState<DecisionSummary[]>(initialDecisionSummaries);
   const scrollRef = useRef<HTMLDivElement>(null);
   const logicFindingsRef = useRef<HTMLDivElement>(null);
   
+  const [selectedDecisions, setSelectedDecisions] = useState<Set<string>>(new Set());
+  const [selectedEvidence, setSelectedEvidence] = useState<Set<string>>(new Set());
+  const [selectedActions, setSelectedActions] = useState<Set<string>>(new Set());
+  const [commitSuccess, setCommitSuccess] = useState(false);
+  
+  const { addToMemory, isItemIntegrated, getIntegrationStatus } = useProjectMemory();
+  
   const filteredEvidenceDrops = evidenceDrops.filter(drop => drop.relevantFinding === selectedFinding);
 
-  const updateDecisionIntegration = (decisionId: string, status: IntegrationStatus) => {
-    setDecisionSummaries(prev => prev.map(d => 
-      d.id === decisionId ? { ...d, integrationStatus: status } : d
-    ));
+  const toggleDecisionSelection = (id: string) => {
+    setSelectedDecisions(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleEvidenceSelection = (id: string) => {
+    setSelectedEvidence(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleActionSelection = (id: string) => {
+    setSelectedActions(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const clearAllSelections = () => {
+    setSelectedDecisions(new Set());
+    setSelectedEvidence(new Set());
+    setSelectedActions(new Set());
+    setCommitSuccess(false);
+  };
+
+  const totalSelectedCount = selectedDecisions.size + selectedEvidence.size + selectedActions.size;
+
+  const handleCommitToMemory = () => {
+    const items: MemoryItem[] = [];
+    const now = new Date().toISOString();
+
+    selectedDecisions.forEach(id => {
+      const decision = decisionSummaries.find(d => d.id === id);
+      if (decision) {
+        items.push({
+          id: `mem-${id}-${Date.now()}`,
+          type: "decision",
+          title: decision.title,
+          sourceId: id,
+          sourceMeetingId: meetingId,
+          integratedAt: now
+        });
+      }
+    });
+
+    selectedEvidence.forEach(id => {
+      const evidence = evidenceDrops.find(e => e.id === id);
+      if (evidence) {
+        items.push({
+          id: `mem-${id}-${Date.now()}`,
+          type: "evidence",
+          title: evidence.title,
+          content: evidence.summary,
+          sourceId: id,
+          sourceMeetingId: meetingId,
+          integratedAt: now
+        });
+      }
+    });
+
+    selectedActions.forEach(id => {
+      const action = actionItemsData.find(a => a.id === id);
+      if (action) {
+        items.push({
+          id: `mem-${id}-${Date.now()}`,
+          type: "action",
+          title: action.task,
+          sourceId: id,
+          sourceMeetingId: meetingId,
+          integratedAt: now
+        });
+      }
+    });
+
+    if (items.length > 0) {
+      addToMemory(projectId, items);
+      setCommitSuccess(true);
+      setSelectedDecisions(new Set());
+      setSelectedEvidence(new Set());
+      setSelectedActions(new Set());
+    }
+  };
+
+  const getItemStatus = (sourceId: string): IntegrationStatus => {
+    return isItemIntegrated(projectId, sourceId) ? "integrated" : "not";
   };
 
   const getMeetingIntegrationStatus = (): IntegrationStatus => {
-    const integratedCount = decisionSummaries.filter(d => d.integrationStatus === "integrated").length;
+    const integratedCount = decisionSummaries.filter(d => isItemIntegrated(projectId, d.id)).length;
     const totalCount = decisionSummaries.length;
     if (integratedCount === totalCount) return "integrated";
     if (integratedCount > 0) return "partial";
     return "not";
-  };
-
-  const handleIntegrate = () => {
-    setPendingMerge(prev => ({ ...prev, isIntegrated: true }));
-    setShowMergeTray(false);
-  };
-
-  const handleDefer = () => {
-    setShowMergeTray(false);
   };
 
   useEffect(() => {
@@ -600,47 +686,41 @@ export default function MeetingDetail() {
               <ScrollArea className="h-40">
                 <CardContent className="p-3">
                   <ul className="space-y-2">
-                    {decisionSummaries.map(decision => (
-                      <li key={decision.id} className="flex items-center gap-2" data-testid={`decision-${decision.id}`}>
-                        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                          decision.status === "confirmed" ? "bg-emerald-500" : 
-                          decision.status === "deferred" ? "bg-amber-500" : "bg-slate-400"
-                        }`} />
-                        <span className="text-sm text-foreground flex-1">{decision.title}</span>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button 
-                              className={`text-xs px-2 py-0.5 rounded flex items-center gap-1 ${integrationStatusConfig[decision.integrationStatus].bgColor} ${integrationStatusConfig[decision.integrationStatus].color}`}
-                              data-testid={`decision-status-${decision.id}`}
-                            >
-                              {decision.integrationStatus === "integrated" ? (
-                                <Check className="w-3 h-3" />
-                              ) : decision.integrationStatus === "partial" ? (
-                                <CircleDot className="w-3 h-3" />
-                              ) : (
-                                <Circle className="w-3 h-3" />
-                              )}
-                              <span>{integrationStatusConfig[decision.integrationStatus].label}</span>
-                              <ChevronDown className="w-3 h-3" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => updateDecisionIntegration(decision.id, "integrated")}>
-                              <Check className="w-4 h-4 mr-2 text-emerald-600" />
-                              통합됨
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => updateDecisionIntegration(decision.id, "partial")}>
-                              <CircleDot className="w-4 h-4 mr-2 text-amber-600" />
-                              부분 통합
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => updateDecisionIntegration(decision.id, "not")}>
-                              <Circle className="w-4 h-4 mr-2 text-slate-500" />
-                              미통합
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </li>
-                    ))}
+                    {decisionSummaries.map(decision => {
+                      const itemStatus = getItemStatus(decision.id);
+                      const isSelected = selectedDecisions.has(decision.id);
+                      const isAlreadyIntegrated = itemStatus === "integrated";
+                      return (
+                        <li key={decision.id} className="flex items-center gap-2" data-testid={`decision-${decision.id}`}>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleDecisionSelection(decision.id)}
+                            disabled={isAlreadyIntegrated}
+                            data-testid={`decision-checkbox-${decision.id}`}
+                          />
+                          <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                            decision.status === "confirmed" ? "bg-emerald-500" : 
+                            decision.status === "deferred" ? "bg-amber-500" : "bg-slate-400"
+                          }`} />
+                          <span className={`text-sm flex-1 ${isAlreadyIntegrated ? "text-muted-foreground" : "text-foreground"}`}>
+                            {decision.title}
+                          </span>
+                          <span 
+                            className={`text-xs px-2 py-0.5 rounded flex items-center gap-1 ${integrationStatusConfig[itemStatus].bgColor} ${integrationStatusConfig[itemStatus].color}`}
+                            data-testid={`decision-status-${decision.id}`}
+                          >
+                            {itemStatus === "integrated" ? (
+                              <Check className="w-3 h-3" />
+                            ) : itemStatus === "partial" ? (
+                              <CircleDot className="w-3 h-3" />
+                            ) : (
+                              <Circle className="w-3 h-3" />
+                            )}
+                            <span>{integrationStatusConfig[itemStatus].label}</span>
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </CardContent>
               </ScrollArea>
@@ -659,25 +739,43 @@ export default function MeetingDetail() {
               <ScrollArea className="h-40">
                 <CardContent className="p-3">
                   <ul className="space-y-2">
-                    {actionItemsData.map(item => (
-                      <li key={item.id} className="flex items-start gap-2" data-testid={`action-summary-${item.id}`}>
-                        <div className={`w-4 h-4 mt-0.5 rounded border flex-shrink-0 flex items-center justify-center ${
-                          item.completed ? "bg-emerald-500 border-emerald-500" : "border-border"
-                        }`}>
-                          {item.completed && (
-                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
+                    {actionItemsData.map(item => {
+                      const itemStatus = getItemStatus(item.id);
+                      const isSelected = selectedActions.has(item.id);
+                      const isAlreadyIntegrated = itemStatus === "integrated";
+                      return (
+                        <li key={item.id} className="flex items-start gap-2" data-testid={`action-summary-${item.id}`}>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleActionSelection(item.id)}
+                            disabled={isAlreadyIntegrated}
+                            className="mt-0.5"
+                            data-testid={`action-checkbox-${item.id}`}
+                          />
+                          <div className={`w-4 h-4 mt-0.5 rounded border flex-shrink-0 flex items-center justify-center ${
+                            item.completed ? "bg-emerald-500 border-emerald-500" : "border-border"
+                          }`}>
+                            {item.completed && (
+                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm ${item.completed ? "line-through text-muted-foreground" : isAlreadyIntegrated ? "text-muted-foreground" : "text-foreground"}`}>
+                              {item.task}
+                            </p>
+                            <span className="text-xs text-muted-foreground">{item.assignee}</span>
+                          </div>
+                          {isAlreadyIntegrated && (
+                            <span className="text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 flex items-center gap-1">
+                              <Check className="w-3 h-3" />
+                              통합됨
+                            </span>
                           )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm ${item.completed ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                            {item.task}
-                          </p>
-                          <span className="text-xs text-muted-foreground">{item.assignee}</span>
-                        </div>
-                      </li>
-                    ))}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </CardContent>
               </ScrollArea>
@@ -743,22 +841,44 @@ export default function MeetingDetail() {
               <CardContent className="p-3">
                 {filteredEvidenceDrops.length > 0 ? (
                   <ul className="space-y-2">
-                    {filteredEvidenceDrops.map(drop => (
-                      <li 
-                        key={drop.id} 
-                        className="group p-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer border border-transparent hover:border-border"
-                        data-testid={`evidence-drop-${drop.id}`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
-                            {drop.title}
-                          </h4>
-                          <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{drop.summary}</p>
-                        <span className="text-xs text-primary mt-1 inline-block">{drop.source}</span>
-                      </li>
-                    ))}
+                    {filteredEvidenceDrops.map(drop => {
+                      const itemStatus = getItemStatus(drop.id);
+                      const isSelected = selectedEvidence.has(drop.id);
+                      const isAlreadyIntegrated = itemStatus === "integrated";
+                      return (
+                        <li 
+                          key={drop.id} 
+                          className="group p-2 rounded-md hover:bg-muted/50 transition-colors border border-transparent hover:border-border"
+                          data-testid={`evidence-drop-${drop.id}`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleEvidenceSelection(drop.id)}
+                              disabled={isAlreadyIntegrated}
+                              className="mt-0.5"
+                              data-testid={`evidence-checkbox-${drop.id}`}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 className={`text-sm font-medium group-hover:text-primary transition-colors ${isAlreadyIntegrated ? "text-muted-foreground" : "text-foreground"}`}>
+                                  {drop.title}
+                                </h4>
+                                {isAlreadyIntegrated ? (
+                                  <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 flex items-center gap-0.5 flex-shrink-0">
+                                    <Check className="w-3 h-3" />
+                                  </span>
+                                ) : (
+                                  <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{drop.summary}</p>
+                              <span className="text-xs text-primary mt-1 inline-block">{drop.source}</span>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : (
                   <p className="text-xs text-muted-foreground text-center py-4">
@@ -847,60 +967,86 @@ export default function MeetingDetail() {
         </div>
       </div>
 
-      {role === "lead" && showMergeTray && !pendingMerge.isIntegrated && (
+      {(totalSelectedCount > 0 || commitSuccess) && (
         <div 
           className="fixed bottom-0 right-0 z-20 animate-in slide-in-from-bottom duration-300 pointer-events-none"
           style={{ left: '256px' }}
-          data-testid="merge-tray"
+          data-testid="integration-commit-bar"
         >
           <div className="max-w-3xl mx-auto px-6 pb-6 pointer-events-auto">
-            <div className="bg-white border border-border rounded-lg shadow-lg p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <ListChecks className="w-5 h-5 text-primary" />
+            <div className="bg-card border border-border rounded-lg shadow-lg p-4">
+              {commitSuccess ? (
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                      <Check className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        프로젝트 기억에 성공적으로 통합되었습니다
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        통합된 항목들은 프로젝트 전체에서 활용됩니다
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      결정 {pendingMerge.decisions}개 + 근거 {pendingMerge.evidence}개를 프로젝트 기억에 통합합니다
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      이 미팅에서 추출된 항목을 프로젝트 Overview에 반영합니다
-                    </p>
+                  <div className="flex items-center gap-2">
+                    <Link href={`/projects/${projectId}/overview`}>
+                      <Button variant="outline" size="sm" data-testid="button-view-memory">
+                        <Database className="w-4 h-4 mr-1.5" />
+                        프로젝트 기억에서 보기
+                      </Button>
+                    </Link>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => setCommitSuccess(false)}
+                      data-testid="button-dismiss-success"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleDefer}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
-                    data-testid="button-defer"
-                  >
-                    <X className="w-4 h-4" />
-                    보류
-                  </button>
-                  <button
-                    onClick={handleIntegrate}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover-elevate"
-                    data-testid="button-integrate"
-                  >
-                    <Check className="w-4 h-4" />
-                    통합
-                  </button>
+              ) : (
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Database className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        선택됨 {totalSelectedCount}개
+                        {selectedDecisions.size > 0 && `: 결정 ${selectedDecisions.size}`}
+                        {selectedEvidence.size > 0 && `, 근거 ${selectedEvidence.size}`}
+                        {selectedActions.size > 0 && `, 할일 ${selectedActions.size}`}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        선택한 항목을 프로젝트 기억에 통합합니다
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={clearAllSelections}
+                      data-testid="button-clear-selection"
+                    >
+                      <X className="w-4 h-4 mr-1.5" />
+                      선택 해제
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleCommitToMemory}
+                      data-testid="button-commit-memory"
+                    >
+                      <Check className="w-4 h-4 mr-1.5" />
+                      프로젝트 기억에 통합
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
-          </div>
-        </div>
-      )}
-
-      {pendingMerge.isIntegrated && (
-        <div 
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-20 animate-in fade-in slide-in-from-bottom-2 duration-300"
-          data-testid="merge-success"
-        >
-          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500 text-white shadow-lg">
-            <Check className="w-4 h-4" />
-            <span className="text-sm font-medium">프로젝트 기억에 통합되었습니다</span>
           </div>
         </div>
       )}

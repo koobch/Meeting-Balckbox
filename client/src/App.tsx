@@ -11,6 +11,7 @@ import EvidencePage from "@/pages/evidence";
 import ProjectsPage from "@/pages/projects";
 import { ProjectLayout } from "@/pages/project-layout";
 import { ChatLauncher } from "@/components/chat-launcher";
+import { ProjectMemoryProvider } from "@/lib/project-memory-context";
 
 function ProjectRoutes() {
   return (
@@ -44,11 +45,13 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-        <ChatLauncher />
-      </TooltipProvider>
+      <ProjectMemoryProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+          <ChatLauncher />
+        </TooltipProvider>
+      </ProjectMemoryProvider>
     </QueryClientProvider>
   );
 }
